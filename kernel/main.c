@@ -20,6 +20,8 @@
 #include <aurora/syscall.h>
 #include <aurora/proc/m4_test.h>
 #include <aurora/proc/m5_test.h>
+#include <aurora/fs/vfs.h>
+#include <aurora/fs/m6_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -68,6 +70,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     vmm_init();
     kmalloc_init();
 
+    /* --- Milestone M6: VFS Subsystem Initialization --- */
+    vfs_init();
+
     /* Run Milestone M2 verification */
     test_memory_subsystem();
 
@@ -90,6 +95,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* --- Milestone M5: fork, execve (ELF64), wait4, signals --- */
     test_fork_execve_wait();
+
+    /* --- Milestone M6: VFS Subsystem verification --- */
+    test_vfs_subsystem();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

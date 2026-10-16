@@ -1345,7 +1345,7 @@ reboot: System halted
 [x] M3  PIT, task_struct, context switch, планировщик
 [x] M4  syscall gate, write/exit/getpid/brk
 [x] M5  fork, wait4, execve (ELF64), сигналы
-[ ] M6  VFS: inode/dentry/file, namei, open/read/write
+[x] M6  VFS: inode/dentry/file, namei, open/read/write
 [ ] M7  ramfs+initrd, procfs, devtmpfs, tmpfs, sysfs
 [ ] M8  ext2/ext4 R/W, mkfs, fsck, pivot_root, fstab
 [ ] M9  TTY, VT0-5, kbd, termios, Ctrl-C

@@ -65,3 +65,15 @@ void serial_puts(const char *str)
         serial_putchar(*str++);
     }
 }
+
+int serial_has_rx(void)
+{
+    return inb(SERIAL_LINE_STATUS_PORT(COM1_PORT)) & 0x01;
+}
+
+char serial_getc(void)
+{
+    while (!serial_has_rx())
+        ;
+    return (char)inb(SERIAL_DATA_PORT(COM1_PORT));
+}

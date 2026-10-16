@@ -45,7 +45,14 @@ C_SRCS  := kernel/main.c \
            kernel/proc/elf.c \
            kernel/proc/stack.c \
            kernel/proc/binaries.c \
-           kernel/proc/m5_test.c
+           kernel/proc/m5_test.c \
+           kernel/fs/vfs.c \
+           kernel/fs/dentry.c \
+           kernel/fs/inode.c \
+           kernel/fs/namei.c \
+           kernel/fs/file.c \
+           kernel/fs/ramfs.c \
+           kernel/fs/m6_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -53,7 +60,8 @@ ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/syscall_entry.S \
             kernel/proc/user_test.S \
             kernel/proc/user_m5.S \
-            kernel/proc/builtin_binaries.S
+            kernel/proc/builtin_binaries.S \
+            kernel/fs/user_vfs.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
@@ -123,13 +131,13 @@ test: $(TARGET_BIN)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M5 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M6 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M5 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M6 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M5 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M6 verification failed! <<<"; \
 		exit 1; \
 	fi
 

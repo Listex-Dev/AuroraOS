@@ -1,5 +1,6 @@
 #include <aurora/proc/task.h>
 #include <aurora/proc/sched.h>
+#include <aurora/fs/vfs.h>
 #include <aurora/mm/heap.h>
 #include <aurora/string.h>
 #include <aurora/printk.h>
@@ -23,6 +24,10 @@ task_t *task_create(const char *name, void (*entry_point)(void))
     task->state = TASK_RUNNING;
     task->time_slice = DEFAULT_TIME_SLICE;
     strncpy(task->comm, name ? name : "kthread", sizeof(task->comm) - 1);
+
+    /* Allocate process file descriptors and filesystem context */
+    task->files = files_alloc();
+    task->fs = fs_alloc();
 
     /* Setup initial stack for cpu_switch_to */
     uint64_t *stack_top = (uint64_t *)((uintptr_t)task->kstack + KERNEL_STACK_SIZE);
@@ -53,6 +58,12 @@ void task_destroy(task_t *task)
         return;
     }
 
+    if (task->files) {
+        files_free((struct files_struct *)task->files);
+    }
+    if (task->fs) {
+        fs_free((struct fs_struct *)task->fs);
+    }
     if (task->kstack) {
         kfree(task->kstack);
     }

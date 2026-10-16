@@ -29,8 +29,28 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
     (void)a5; (void)a6;
 
     switch (num) {
+        case SYS_read:
+            return sys_read((int)a1, (void *)a2, (size_t)a3);
         case SYS_write:
             return sys_write((int)a1, (const void *)a2, (size_t)a3);
+        case SYS_open:
+            return sys_open((const char *)a1, (int)a2, (mode_t)a3);
+        case SYS_close:
+            return sys_close((int)a1);
+        case SYS_stat:
+            return sys_stat((const char *)a1, (struct stat *)a2);
+        case SYS_fstat:
+            return sys_fstat((int)a1, (struct stat *)a2);
+        case SYS_lseek:
+            return sys_lseek((int)a1, (uint64_t)a2, (int)a3);
+        case SYS_dup:
+            return sys_dup((int)a1);
+        case SYS_dup2:
+            return sys_dup2((int)a1, (int)a2);
+        case SYS_mkdir:
+            return sys_mkdir((const char *)a1, (mode_t)a2);
+        case SYS_unlink:
+            return sys_unlink((const char *)a1);
         case SYS_exit:
             return sys_exit((int)a1);
         case SYS_getpid:

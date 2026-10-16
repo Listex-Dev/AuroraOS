@@ -8,6 +8,7 @@
 #include <aurora/mm/vmm.h>
 #include <aurora/mm/heap.h>
 #include <aurora/arch/x86_64/cr.h>
+#include <aurora/fs/vfs.h>
 #include <aurora/string.h>
 #include <aurora/printk.h>
 #include <aurora/errno.h>
@@ -71,6 +72,10 @@ int64_t sys_fork(void)
     child->brk_start = curr->brk_start;
     child->brk_current = curr->brk_current;
     strncpy(child->comm, curr->comm, sizeof(child->comm) - 1);
+
+    /* Clone file descriptor table and filesystem root/pwd */
+    child->files = files_clone((struct files_struct *)curr->files);
+    child->fs = fs_clone((struct fs_struct *)curr->fs);
 
     /* 5. Setup child kernel stack and pt_regs */
     struct pt_regs *child_regs = (struct pt_regs *)((uintptr_t)child->kstack + KERNEL_STACK_SIZE - sizeof(struct pt_regs));
@@ -174,6 +179,18 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
     /* 6. Free previous user space if custom */
     if (curr->pml4 && curr->pml4 != k_pml4) {
         vmm_destroy_user_space(curr->pml4);
+    }
+
+    /* Close file descriptors marked with FD_CLOEXEC */
+    if (curr->files) {
+        struct files_struct *files = (struct files_struct *)curr->files;
+        for (int i = 0; i < NR_OPEN; i++) {
+            if (files->fd[i] && (files->fd_flags[i] & FD_CLOEXEC)) {
+                vfs_close(files->fd[i]);
+                files->fd[i] = NULL;
+                files->fd_flags[i] = 0;
+            }
+        }
     }
 
     curr->pml4 = new_pml4;
