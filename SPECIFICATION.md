@@ -78,9 +78,9 @@ AuroraOS следует классическим правилам Unix (McIlroy 
 
 | Вопрос | Ответ |
 |---|---|
-| Строка кода ядра | ~2700 |
+| Строка кода ядра | ~3500 |
 | Работающий загрузчик | ✅ (Multiboot 1/2 трамплин в Long Mode) |
-| Работающее ядро | ✅ (M0..M3: GDT/IDT, PMM/VMM/Heap, PIT/Sched) |
+| Работающее ядро | ✅ (M0..M4: GDT/IDT, PMM/VMM/Heap, PIT/Sched, Syscalls/Ring 3) |
 | Работающая shell | ❌ |
 | Образ диска | ❌ |
 | Версия | `0.0.1-dev` |
@@ -88,6 +88,7 @@ AuroraOS следует классическим правилам Unix (McIlroy 
 | Вторая веха | **M1 — GDT, IDT, исключения** — ✅ ЗАВЕРШЕНА |
 | Третья веха | **M2 — PMM, VMM, Direct Map, Heap** — ✅ ЗАВЕРШЕНА |
 | Четвёртая веха | **M3 — PIT 100Hz, Multitasking, Sched** — ✅ ЗАВЕРШЕНА |
+| Пятая веха | **M4 — Syscall Gate, Ring 3, User Mode** — ✅ ЗАВЕРШЕНА |
 
 Все пункты чек-листов в этом документе отмечены `[ ]` **по определению** — это план, а не отчёт.
 
@@ -1080,7 +1081,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M1** | MBR/Multiboot2, GDT, переход в long mode, paging, IDT, исключения | Двойное_fault не возникает; `#PF` печатает адрес | `[x]` |
 | **M2** | PMM (bitmap), VMM, direct map, heap `kmalloc/kfree` | Тест: 1 млн alloc/free без утечек | `[x]` |
 | **M3** | PIT 100 Гц, `task_struct`, context switch, планировщик, `sched_yield` | Два цикла печатают `A`/`B` вперемешку | `[x]` |
-| **M4** | Syscall gate (`syscall`/`int 0x80`), `write`, `exit`, `getpid`, `brk` | Пользовательский ring-3 код печатает в консоль и выходит | `[ ]` |
+| **M4** | Syscall gate (`syscall`/`int 0x80`), `write`, `exit`, `getpid`, `brk` | Пользовательский ring-3 код печатает в консоль и выходит | `[x]` |
 | **M5** | `fork`, `wait4`, `execve` (ELF64), стек `argv/envp/auxv`, сигналы | Программа делает `fork` → `execve("/bin/hello")` → `wait4` → код возврата | `[ ]` |
 | **M6** | VFS: `inode/dentry/file`, namei, `open/read/write/close/lseek/stat` | Файлы в `ramfs` читаются/пишутся | `[ ]` |
 | **M7** | `ramfs` + initrd + `cpio`; `procfs`; `devtmpfs`; `tmpfs`; `sysfs` | `/proc/meminfo`, `/dev/console`, `/tmp` работают | `[ ]` |
@@ -1342,7 +1343,7 @@ reboot: System halted
 [x] M1  Multiboot2, GDT, long mode, IDT, исключения
 [x] M2  PMM, VMM, paging, kmalloc/kfree
 [x] M3  PIT, task_struct, context switch, планировщик
-[ ] M4  syscall gate, write/exit/getpid/brk
+[x] M4  syscall gate, write/exit/getpid/brk
 [ ] M5  fork, wait4, execve (ELF64), сигналы
 [ ] M6  VFS: inode/dentry/file, namei, open/read/write
 [ ] M7  ramfs+initrd, procfs, devtmpfs, tmpfs, sysfs

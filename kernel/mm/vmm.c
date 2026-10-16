@@ -35,6 +35,8 @@ int vmm_map_page(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags)
         }
         memset(vmm_phys_to_virt(pdpt_phys), 0, PAGE_SIZE);
         pml4[pml4_idx] = pdpt_phys | PTE_PRESENT | PTE_WRITABLE | (flags & PTE_USER);
+    } else if (flags & PTE_USER) {
+        pml4[pml4_idx] |= PTE_USER;
     }
 
     uint64_t *pdpt = (uint64_t *)vmm_phys_to_virt(pml4[pml4_idx] & PTE_ADDR_MASK);
@@ -47,18 +49,22 @@ int vmm_map_page(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags)
         }
         memset(vmm_phys_to_virt(pd_phys), 0, PAGE_SIZE);
         pdpt[pdpt_idx] = pd_phys | PTE_PRESENT | PTE_WRITABLE | (flags & PTE_USER);
+    } else if (flags & PTE_USER) {
+        pdpt[pdpt_idx] |= PTE_USER;
     }
 
     uint64_t *pd = (uint64_t *)vmm_phys_to_virt(pdpt[pdpt_idx] & PTE_ADDR_MASK);
 
     /* 3. Level 2 -> Level 1 (PT) */
-    if (!(pd[pd_idx] & PTE_PRESENT)) {
+    if (!(pd[pd_idx] & PTE_PRESENT) || (pd[pd_idx] & PTE_HUGE)) {
         uintptr_t pt_phys = pmm_alloc_page();
         if (!pt_phys) {
             return -1;
         }
         memset(vmm_phys_to_virt(pt_phys), 0, PAGE_SIZE);
         pd[pd_idx] = pt_phys | PTE_PRESENT | PTE_WRITABLE | (flags & PTE_USER);
+    } else if (flags & PTE_USER) {
+        pd[pd_idx] |= PTE_USER;
     }
 
     uint64_t *pt = (uint64_t *)vmm_phys_to_virt(pd[pd_idx] & PTE_ADDR_MASK);
@@ -118,7 +124,6 @@ uint64_t vmm_virt_to_phys(uint64_t *pml4, uint64_t virt)
         return 0;
     }
 
-    /* Check if 2MB huge page */
     if (pd[pd_idx] & PTE_HUGE) {
         return (pd[pd_idx] & ~0x1FFFFFULL) | (virt & 0x1FFFFFULL);
     }
@@ -134,6 +139,11 @@ uint64_t vmm_virt_to_phys(uint64_t *pml4, uint64_t virt)
 void vmm_init(void)
 {
     kernel_pml4 = vmm_get_kernel_pml4();
+
+    /* Unmap the early boot identity map (PML4[0]) to reclaim clean user space (0..512GB) */
+    kernel_pml4[0] = 0;
+    vmm_invlpg(0);
+
     printk("<6>[  0.000000] VMM: 4-Level Paging initialized (PML4 at %p)\n", (void *)read_cr3());
     printk("<6>[  0.000000] VMM: Direct physical memory map active at 0x%p\n", (void *)KERNEL_DIRECT_MAP_BASE);
 }

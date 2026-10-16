@@ -17,6 +17,8 @@
 #include <aurora/proc/task.h>
 #include <aurora/proc/sched.h>
 #include <aurora/proc/m3_test.h>
+#include <aurora/syscall.h>
+#include <aurora/proc/m4_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -78,6 +80,12 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* Run Milestone M3 verification */
     test_scheduler_multitasking();
+
+    /* --- Milestone M4: Syscall Gate & User Mode --- */
+    syscall_init();
+
+    /* Run Milestone M4 verification */
+    test_usermode_syscall();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

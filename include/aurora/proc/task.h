@@ -45,6 +45,9 @@ struct task_struct {
     uint64_t stime;
     int nice;
 
+    uint64_t brk_start;
+    uint64_t brk_current;
+
     int time_slice;
     int exit_code;
     char comm[16];

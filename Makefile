@@ -36,11 +36,18 @@ C_SRCS  := kernel/main.c \
            kernel/arch/x86_64/pit.c \
            kernel/proc/task.c \
            kernel/proc/sched.c \
-           kernel/proc/m3_test.c
+           kernel/proc/m3_test.c \
+           kernel/syscall/syscall.c \
+           kernel/syscall/sys_file.c \
+           kernel/syscall/sys_proc.c \
+           kernel/syscall/sys_mm.c \
+           kernel/proc/m4_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
-            kernel/arch/x86_64/context.S
+            kernel/arch/x86_64/context.S \
+            kernel/arch/x86_64/syscall_entry.S \
+            kernel/proc/user_test.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
@@ -102,13 +109,13 @@ test: $(TARGET_BIN)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M3 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M4 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M3 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M4 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M3 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M4 verification failed! <<<"; \
 		exit 1; \
 	fi
 
