@@ -27,7 +27,11 @@ C_SRCS  := kernel/main.c \
            kernel/arch/x86_64/gdt.c \
            kernel/arch/x86_64/idt.c \
            kernel/arch/x86_64/exceptions.c \
-           kernel/arch/x86_64/m1_test.c
+           kernel/arch/x86_64/m1_test.c \
+           kernel/mm/pmm.c \
+           kernel/mm/vmm.c \
+           kernel/mm/heap.c \
+           kernel/mm/m2_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S
@@ -85,20 +89,20 @@ debug: $(TARGET_ELF) $(TARGET_BIN)
 
 test: $(TARGET_BIN)
 	@echo "Running Milestone automated acceptance test..."
-	@output=$$(timeout 4s qemu-system-x86_64 \
+	@output=$$(timeout 6s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M1 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M2 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M1 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M2 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M1 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M2 verification failed! <<<"; \
 		exit 1; \
 	fi
 

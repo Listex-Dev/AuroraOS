@@ -8,6 +8,10 @@
 #include <aurora/arch/x86_64/idt.h>
 #include <aurora/arch/x86_64/interrupts.h>
 #include <aurora/arch/x86_64/m1_test.h>
+#include <aurora/mm/pmm.h>
+#include <aurora/mm/vmm.h>
+#include <aurora/mm/heap.h>
+#include <aurora/mm/m2_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -48,8 +52,16 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     idt_init();
     exceptions_init();
 
-    /* Run Milestone M1 automated verification */
+    /* Run Milestone M1 verification */
     test_page_fault_handling();
+
+    /* --- Milestone M2: PMM, VMM, Direct Map, Heap --- */
+    pmm_init();
+    vmm_init();
+    kmalloc_init();
+
+    /* Run Milestone M2 verification */
+    test_memory_subsystem();
 
     /* Halt CPU awaiting interrupts in future milestones */
     while (1) {
