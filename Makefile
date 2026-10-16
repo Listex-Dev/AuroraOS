@@ -31,10 +31,16 @@ C_SRCS  := kernel/main.c \
            kernel/mm/pmm.c \
            kernel/mm/vmm.c \
            kernel/mm/heap.c \
-           kernel/mm/m2_test.c
+           kernel/mm/m2_test.c \
+           kernel/arch/x86_64/pic.c \
+           kernel/arch/x86_64/pit.c \
+           kernel/proc/task.c \
+           kernel/proc/sched.c \
+           kernel/proc/m3_test.c
 
 ASM_SRCS := boot/boot.S \
-            kernel/arch/x86_64/idt_asm.S
+            kernel/arch/x86_64/idt_asm.S \
+            kernel/arch/x86_64/context.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
@@ -96,13 +102,13 @@ test: $(TARGET_BIN)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M2 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M3 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M2 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M3 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M2 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M3 verification failed! <<<"; \
 		exit 1; \
 	fi
 

@@ -7,11 +7,16 @@
 #include <aurora/arch/x86_64/gdt.h>
 #include <aurora/arch/x86_64/idt.h>
 #include <aurora/arch/x86_64/interrupts.h>
+#include <aurora/arch/x86_64/pic.h>
+#include <aurora/arch/x86_64/pit.h>
 #include <aurora/arch/x86_64/m1_test.h>
 #include <aurora/mm/pmm.h>
 #include <aurora/mm/vmm.h>
 #include <aurora/mm/heap.h>
 #include <aurora/mm/m2_test.h>
+#include <aurora/proc/task.h>
+#include <aurora/proc/sched.h>
+#include <aurora/proc/m3_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -63,7 +68,18 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     /* Run Milestone M2 verification */
     test_memory_subsystem();
 
-    /* Halt CPU awaiting interrupts in future milestones */
+    /* --- Milestone M3: PIC, PIT 100Hz, Scheduler --- */
+    pic_init();
+    pit_init(PIT_TARGET_HZ);
+    sched_init();
+
+    /* Enable hardware interrupts */
+    sti();
+
+    /* Run Milestone M3 verification */
+    test_scheduler_multitasking();
+
+    /* Halt CPU awaiting interrupts */
     while (1) {
         hlt();
     }
