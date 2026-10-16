@@ -1,5 +1,6 @@
 #include <aurora/fs/vfs.h>
 #include <aurora/fs/ramfs.h>
+#include <aurora/fs/mount.h>
 #include <aurora/mm/heap.h>
 #include <aurora/serial.h>
 #include <aurora/string.h>
@@ -50,11 +51,22 @@ void vfs_init(void)
         return;
     }
 
-    /* Create standard initial directories */
+    /* Create standard initial mountpoint and system directories */
     vfs_mkdir("/dev", 0755);
+    vfs_mkdir("/proc", 0555);
+    vfs_mkdir("/sys", 0755);
     vfs_mkdir("/bin", 0755);
     vfs_mkdir("/tmp", 0777);
+    vfs_mkdir("/run", 0755);
     vfs_mkdir("/etc", 0755);
+    vfs_mkdir("/mnt", 0755);
+
+    /* Mount synthetic and temporary filesystems */
+    vfs_mount("proc", "/proc", "procfs", 0, NULL);
+    vfs_mount("devtmpfs", "/dev", "devtmpfs", 0, NULL);
+    vfs_mount("sysfs", "/sys", "sysfs", 0, NULL);
+    vfs_mount("tmpfs", "/tmp", "tmpfs", 0, NULL);
+    vfs_mount("tmpfs", "/run", "tmpfs", 0, NULL);
 
     printk("<6>[  0.000000] VFS: Virtual File System initialized with root RamFS at /\n");
 }

@@ -102,3 +102,45 @@ char *strncpy(char *dest, const char *src, size_t n)
     }
     return ret;
 }
+
+char *strchr(const char *s, int c)
+{
+    while (*s != (char)c) {
+        if (!*s++) {
+            return NULL;
+        }
+    }
+    return (char *)s;
+}
+
+char *strrchr(const char *s, int c)
+{
+    const char *last = NULL;
+    do {
+        if (*s == (char)c) {
+            last = s;
+        }
+    } while (*s++);
+    return (char *)last;
+}
+
+char *strstr(const char *haystack, const char *needle)
+{
+    if (!*needle) {
+        return (char *)haystack;
+    }
+    for (; *haystack; haystack++) {
+        if (*haystack == *needle) {
+            const char *h = haystack;
+            const char *n = needle;
+            while (*h && *n && (*h == *n)) {
+                h++;
+                n++;
+            }
+            if (!*n) {
+                return (char *)haystack;
+            }
+        }
+    }
+    return NULL;
+}

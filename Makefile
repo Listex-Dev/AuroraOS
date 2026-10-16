@@ -52,7 +52,14 @@ C_SRCS  := kernel/main.c \
            kernel/fs/namei.c \
            kernel/fs/file.c \
            kernel/fs/ramfs.c \
-           kernel/fs/m6_test.c
+           kernel/fs/mount.c \
+           kernel/fs/procfs.c \
+           kernel/fs/devtmpfs.c \
+           kernel/fs/tmpfs.c \
+           kernel/fs/sysfs.c \
+           kernel/fs/cpio.c \
+           kernel/fs/m6_test.c \
+           kernel/fs/m7_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -61,7 +68,8 @@ ASM_SRCS := boot/boot.S \
             kernel/proc/user_test.S \
             kernel/proc/user_m5.S \
             kernel/proc/builtin_binaries.S \
-            kernel/fs/user_vfs.S
+            kernel/fs/user_vfs.S \
+            kernel/fs/user_m7.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
@@ -124,20 +132,20 @@ debug: $(TARGET_ELF) $(TARGET_BIN)
 
 test: $(TARGET_BIN)
 	@echo "Running Milestone automated acceptance test..."
-	@output=$$(timeout 6s qemu-system-x86_64 \
+	@output=$$(timeout 8s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M6 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M7 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M6 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M7 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M6 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M7 verification failed! <<<"; \
 		exit 1; \
 	fi
 

@@ -11,6 +11,7 @@ struct super_block;
 struct inode;
 struct dentry;
 struct file;
+struct vfsmount;
 
 /* 1. File Operations */
 struct file_operations {
@@ -78,8 +79,19 @@ struct dentry {
     struct super_block      *d_sb;
     int                      d_count;
 
+    struct vfsmount         *d_mounted; /* If mounted over, points to vfsmount */
     struct dentry           *d_subdirs; /* Child list head */
     struct dentry           *d_next;    /* Sibling link */
+};
+
+/* 7. VFS Mount Record */
+struct vfsmount {
+    struct dentry           *mnt_mountpoint;
+    struct super_block      *mnt_sb;
+    struct dentry           *mnt_root;
+    char                     mnt_devname[64];
+    uint32_t                 mnt_flags;
+    struct vfsmount         *mnt_next;
 };
 
 /* 7. Open File Object */
@@ -139,6 +151,7 @@ int vfs_stat(const char *path, struct stat *statbuf);
 int vfs_fstat(struct file *file, struct stat *statbuf);
 int vfs_mkdir(const char *path, mode_t mode);
 int vfs_unlink(const char *path);
+int vfs_mount(const char *source, const char *target, const char *fstype, uint32_t flags, const void *data);
 
 /* Global device operations for console */
 extern struct file_operations g_console_fops;

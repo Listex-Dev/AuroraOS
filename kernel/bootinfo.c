@@ -41,6 +41,16 @@ void bootinfo_init(uint64_t magic, uint64_t mbi_addr)
             g_boot_info.cmdline = (const char *)phys_to_virt(cmdline_phys);
         }
 
+        if (flags & (1 << 3)) {
+            uint32_t mods_count = mbi[5];
+            uint32_t mods_addr = mbi[6];
+            if (mods_count > 0 && mods_addr != 0) {
+                uint32_t *mod = (uint32_t *)phys_to_virt(mods_addr);
+                g_boot_info.initrd_start = mod[0];
+                g_boot_info.initrd_end = mod[1];
+            }
+        }
+
         /* Check for memory map (bit 6) */
         if (flags & (1 << 6)) {
             uint32_t mmap_len = mbi[11];
@@ -71,6 +81,10 @@ void bootinfo_init(uint64_t magic, uint64_t mbi_addr)
             if (type == 1) {
                 /* Command line */
                 g_boot_info.cmdline = (const char *)(tag_ptr + 8);
+            } else if (type == 3) {
+                /* Multiboot 2 Module */
+                g_boot_info.initrd_start = *(uint32_t *)(tag_ptr + 8);
+                g_boot_info.initrd_end = *(uint32_t *)(tag_ptr + 12);
             } else if (type == 4) {
                 /* Basic meminfo */
                 g_boot_info.mem_lower_kb = *(uint32_t *)(tag_ptr + 8);

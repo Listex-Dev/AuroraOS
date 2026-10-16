@@ -2,12 +2,34 @@
 #include <aurora/serial.h>
 #include <aurora/string.h>
 
-typedef __builtin_va_list va_list;
-#define va_start(ap, last) __builtin_va_start(ap, last)
-#define va_arg(ap, type)   __builtin_va_arg(ap, type)
-#define va_end(ap)         __builtin_va_end(ap)
+struct fmt_stream {
+    char   *buf;
+    size_t  size;
+    size_t  count;
+    bool    to_serial;
+};
 
-static void print_num(int64_t num, int base, bool is_signed, bool uppercase, int width, char pad)
+static void stream_putc(struct fmt_stream *s, char c)
+{
+    if (s->to_serial) {
+        serial_putchar(c);
+        s->count++;
+    } else {
+        if (s->buf && s->size > 0 && s->count + 1 < s->size) {
+            s->buf[s->count] = c;
+        }
+        s->count++;
+    }
+}
+
+static void stream_puts(struct fmt_stream *s, const char *str)
+{
+    while (*str) {
+        stream_putc(s, *str++);
+    }
+}
+
+static void stream_print_num(struct fmt_stream *s, int64_t num, int base, bool is_signed, bool uppercase, int width, char pad)
 {
     char buf[65];
     char digits_lower[] = "0123456789abcdef";
@@ -34,52 +56,53 @@ static void print_num(int64_t num, int base, bool is_signed, bool uppercase, int
         }
     }
 
-    if (negative) {
-        if (pad == '0') {
-            serial_putchar('-');
-            width--;
-            negative = false;
-        }
+    int total_len = i + (negative ? 1 : 0);
+
+    if (pad == '0' && negative) {
+        stream_putc(s, '-');
+        negative = false;
+        width--;
     }
 
-    while (i < width && (pad == ' ' || pad == '0')) {
-        serial_putchar(pad);
+    while (total_len < width && pad == ' ') {
+        stream_putc(s, ' ');
         width--;
     }
 
     if (negative) {
-        serial_putchar('-');
+        stream_putc(s, '-');
+    }
+
+    while (i < width && pad == '0') {
+        stream_putc(s, '0');
+        width--;
     }
 
     while (i > 0) {
-        serial_putchar(buf[--i]);
+        stream_putc(s, buf[--i]);
     }
 }
 
-int vprintk(const char *fmt, va_list args)
+static int format_internal(struct fmt_stream *s, const char *fmt, va_list args)
 {
-    int count = 0;
-
-    /* Check for Linux-style loglevel prefix like "<6>" */
-    if (fmt[0] == '<' && fmt[1] >= '0' && fmt[1] <= '7' && fmt[2] == '>') {
-        /* Format log level tag nicely for early console if desired */
+    /* Check for Linux-style loglevel prefix like "<6>" only when outputting to serial */
+    if (s->to_serial && fmt[0] == '<' && fmt[1] >= '0' && fmt[1] <= '7' && fmt[2] == '>') {
         switch (fmt[1]) {
-            case '0': serial_puts("[EMERG] "); break;
-            case '1': serial_puts("[ALERT] "); break;
-            case '2': serial_puts("[CRIT]  "); break;
-            case '3': serial_puts("[ERR]   "); break;
-            case '4': serial_puts("[WARN]  "); break;
-            case '5': serial_puts("[NOTE]  "); break;
-            case '6': serial_puts("[INFO]  "); break;
-            case '7': serial_puts("[DEBUG] "); break;
+            case '0': stream_puts(s, "[EMERG] "); break;
+            case '1': stream_puts(s, "[ALERT] "); break;
+            case '2': stream_puts(s, "[CRIT]  "); break;
+            case '3': stream_puts(s, "[ERR]   "); break;
+            case '4': stream_puts(s, "[WARN]  "); break;
+            case '5': stream_puts(s, "[NOTE]  "); break;
+            case '6': stream_puts(s, "[INFO]  "); break;
+            case '7': stream_puts(s, "[DEBUG] "); break;
         }
         fmt += 3;
     }
 
     for (const char *p = fmt; *p != '\0'; p++) {
         if (*p != '%') {
-            serial_putchar(*p);
-            count++;
+            stream_putc(s, *p);
             continue;
         }
 
@@ -112,62 +135,77 @@ int vprintk(const char *fmt, va_list args)
         switch (*p) {
             case 'c': {
                 char c = (char)va_arg(args, int);
-                serial_putchar(c);
-                count++;
+                stream_putc(s, c);
                 break;
             }
             case 's': {
-                const char *s = va_arg(args, const char *);
-                if (!s) {
-                    s = "(null)";
+                const char *str = va_arg(args, const char *);
+                if (!str) {
+                    str = "(null)";
                 }
-                while (*s) {
-                    serial_putchar(*s++);
-                    count++;
+                while (*str) {
+                    stream_putc(s, *str++);
                 }
                 break;
             }
             case 'd':
             case 'i': {
                 int64_t val = is_long ? va_arg(args, int64_t) : va_arg(args, int);
-                print_num(val, 10, true, false, width, pad);
+                stream_print_num(s, val, 10, true, false, width, pad);
                 break;
             }
             case 'u': {
                 uint64_t val = is_long ? va_arg(args, uint64_t) : va_arg(args, unsigned int);
-                print_num(val, 10, false, false, width, pad);
+                stream_print_num(s, val, 10, false, false, width, pad);
                 break;
             }
             case 'x': {
                 uint64_t val = is_long ? va_arg(args, uint64_t) : va_arg(args, unsigned int);
-                print_num(val, 16, false, false, width, pad);
+                stream_print_num(s, val, 16, false, false, width, pad);
                 break;
             }
             case 'X': {
                 uint64_t val = is_long ? va_arg(args, uint64_t) : va_arg(args, unsigned int);
-                print_num(val, 16, false, true, width, pad);
+                stream_print_num(s, val, 16, false, true, width, pad);
                 break;
             }
             case 'p': {
                 uint64_t val = (uint64_t)va_arg(args, void *);
-                serial_puts("0x");
-                print_num(val, 16, false, false, 16, '0');
+                stream_puts(s, "0x");
+                stream_print_num(s, val, 16, false, false, 16, '0');
                 break;
             }
             case '%': {
-                serial_putchar('%');
-                count++;
+                stream_putc(s, '%');
                 break;
             }
             default:
-                serial_putchar('%');
-                serial_putchar(*p);
-                count += 2;
+                stream_putc(s, '%');
+                stream_putc(s, *p);
                 break;
         }
     }
 
-    return count;
+    if (!s->to_serial && s->buf && s->size > 0) {
+        if (s->count < s->size) {
+            s->buf[s->count] = '\0';
+        } else {
+            s->buf[s->size - 1] = '\0';
+        }
+    }
+
+    return (int)s->count;
+}
+
+int vprintk(const char *fmt, va_list args)
+{
+    struct fmt_stream s = {
+        .buf = NULL,
+        .size = 0,
+        .count = 0,
+        .to_serial = true,
+    };
+    return format_internal(&s, fmt, args);
 }
 
 int printk(const char *fmt, ...)
@@ -175,6 +213,26 @@ int printk(const char *fmt, ...)
     va_list args;
     va_start(args, fmt);
     int ret = vprintk(fmt, args);
+    va_end(args);
+    return ret;
+}
+
+int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
+{
+    struct fmt_stream s = {
+        .buf = buf,
+        .size = size,
+        .count = 0,
+        .to_serial = false,
+    };
+    return format_internal(&s, fmt, args);
+}
+
+int snprintf(char *buf, size_t size, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    int ret = vsnprintf(buf, size, fmt, args);
     va_end(args);
     return ret;
 }

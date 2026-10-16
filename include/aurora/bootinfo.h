@@ -30,6 +30,8 @@ struct boot_info {
     uint64_t total_memory_bytes;
     uint32_t mmap_count;
     struct boot_mmap_entry mmap[BOOTINFO_MMAP_MAX_ENTRIES];
+    uint64_t initrd_start;
+    uint64_t initrd_end;
 };
 
 extern struct boot_info g_boot_info;

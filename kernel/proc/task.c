@@ -58,6 +58,8 @@ void task_destroy(task_t *task)
         return;
     }
 
+    sched_remove_task(task);
+
     if (task->files) {
         files_free((struct files_struct *)task->files);
     }

@@ -65,6 +65,11 @@ bool test_scheduler_multitasking(void)
 
     serial_putchar('\n');
 
+    sched_remove_task(ta);
+    sched_remove_task(tb);
+    task_destroy(ta);
+    task_destroy(tb);
+
     if (count_a == ITERATIONS && count_b == ITERATIONS) {
         printk("<6>[TEST SCHED] OK: Successfully interleaved %d 'A's and %d 'B's!\n",
                count_a, count_b);
