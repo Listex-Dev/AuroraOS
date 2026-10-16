@@ -1,0 +1,101 @@
+# AuroraOS Makefile
+# Targets: kernel, run, debug, test, clean
+
+CC      := gcc
+LD      := ld
+AS      := gcc
+OBJCOPY := objcopy
+
+CFLAGS  := -Wall -Wextra -Werror -O2 -fno-omit-frame-pointer \
+           -ffreestanding -fno-stack-protector -fno-pie -no-pie \
+           -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
+           -nostdlib -Iinclude
+
+ASFLAGS := -c -Iinclude
+
+LDFLAGS := -nostdlib -z max-page-size=0x1000 -T boot/linker.ld
+
+BUILD_DIR := build
+
+C_SRCS  := kernel/main.c \
+           kernel/panic.c \
+           kernel/printk.c \
+           kernel/bootinfo.c \
+           kernel/lib/string.c \
+           kernel/drivers/serial.c
+
+ASM_SRCS := boot/boot.S
+
+OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
+        $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
+
+TARGET_ELF := $(BUILD_DIR)/aurora.elf
+TARGET_BIN := $(BUILD_DIR)/aurora.bin
+
+.PHONY: all kernel run debug test clean
+
+all: kernel
+
+kernel: $(TARGET_ELF) $(TARGET_BIN)
+
+$(TARGET_ELF): $(OBJS) boot/linker.ld
+	@mkdir -p $(dir $@)
+	@echo "  LD      $@"
+	@$(LD) $(LDFLAGS) -o $@ $(OBJS)
+
+$(TARGET_BIN): $(TARGET_ELF)
+	@echo "  OBJCOPY $@ (Multiboot bootable image)"
+	@$(OBJCOPY) -O elf32-i386 $< $@
+	@echo "Kernel build complete: $(TARGET_ELF) and $(TARGET_BIN)"
+
+$(BUILD_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	@echo "  CC      $<"
+	@$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.o: %.S
+	@mkdir -p $(dir $@)
+	@echo "  AS      $<"
+	@$(AS) $(ASFLAGS) $< -o $@
+
+run: $(TARGET_BIN)
+	@echo "Starting AuroraOS in QEMU (press Ctrl-A then X to exit)..."
+	qemu-system-x86_64 \
+		-machine q35 -m 512M -smp 1 \
+		-kernel $(TARGET_BIN) \
+		-serial stdio \
+		-display none \
+		-no-reboot -no-shutdown
+
+debug: $(TARGET_ELF) $(TARGET_BIN)
+	@echo "Starting AuroraOS in debug mode (GDB port :1234)..."
+	qemu-system-x86_64 \
+		-machine q35 -m 512M -smp 1 \
+		-kernel $(TARGET_BIN) \
+		-serial stdio \
+		-display none \
+		-no-reboot -no-shutdown \
+		-s -S
+
+test: $(TARGET_BIN)
+	@echo "Running Milestone automated acceptance test..."
+	@output=$$(timeout 4s qemu-system-x86_64 \
+		-machine q35 -m 512M -smp 1 \
+		-kernel $(TARGET_BIN) \
+		-serial stdio \
+		-display none \
+		-no-reboot -no-shutdown 2>&1 || true); \
+	echo "$$output"; \
+	if echo "$$output" | grep -q "AuroraOS 1.0.0 booting..."; then \
+		echo ""; \
+		echo ">>> TEST PASSED: Milestone M0 Acceptance Criteria Verified! <<<"; \
+		exit 0; \
+	else \
+		echo ""; \
+		echo ">>> TEST FAILED: Missing required serial boot string! <<<"; \
+		exit 1; \
+	fi
+
+clean:
+	@rm -rf $(BUILD_DIR)
+	@echo "Cleaned build directory."
