@@ -4,6 +4,10 @@
 #include <aurora/panic.h>
 #include <aurora/bootinfo.h>
 #include <aurora/io.h>
+#include <aurora/arch/x86_64/gdt.h>
+#include <aurora/arch/x86_64/idt.h>
+#include <aurora/arch/x86_64/interrupts.h>
+#include <aurora/arch/x86_64/m1_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -38,9 +42,16 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     }
 
     printk("<6>[  0.000000] Drivers: serial COM1 initialized at 0x3F8\n");
-    printk("<6>[  0.000000] Milestone M0 status: [OK] Repository scaffold, toolchain, Makefile, printk, serial\n");
 
-    /* Milestone M0 achieved; halt CPU awaiting interrupts in future milestones */
+    /* --- Milestone M1: GDT, TSS, IDT, Exceptions --- */
+    gdt_init();
+    idt_init();
+    exceptions_init();
+
+    /* Run Milestone M1 automated verification */
+    test_page_fault_handling();
+
+    /* Halt CPU awaiting interrupts in future milestones */
     while (1) {
         hlt();
     }

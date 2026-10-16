@@ -22,9 +22,15 @@ C_SRCS  := kernel/main.c \
            kernel/printk.c \
            kernel/bootinfo.c \
            kernel/lib/string.c \
-           kernel/drivers/serial.c
+           kernel/drivers/serial.c \
+           kernel/arch/x86_64/tss.c \
+           kernel/arch/x86_64/gdt.c \
+           kernel/arch/x86_64/idt.c \
+           kernel/arch/x86_64/exceptions.c \
+           kernel/arch/x86_64/m1_test.c
 
-ASM_SRCS := boot/boot.S
+ASM_SRCS := boot/boot.S \
+            kernel/arch/x86_64/idt_asm.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
@@ -86,13 +92,13 @@ test: $(TARGET_BIN)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "AuroraOS 1.0.0 booting..."; then \
+	if echo "$$output" | grep -q "Milestone M1 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M0 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M1 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Missing required serial boot string! <<<"; \
+		echo ">>> TEST FAILED: Milestone M1 verification failed! <<<"; \
 		exit 1; \
 	fi
 

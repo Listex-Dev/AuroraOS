@@ -78,13 +78,14 @@ AuroraOS следует классическим правилам Unix (McIlroy 
 
 | Вопрос | Ответ |
 |---|---|
-| Строка кода ядра | ~600 |
+| Строка кода ядра | ~1200 |
 | Работающий загрузчик | ✅ (Multiboot 1/2 трамплин в Long Mode) |
-| Работающее ядро | ✅ (M0: serial, printk, bootinfo, higher-half) |
+| Работающее ядро | ✅ (M0: serial/printk; M1: GDT/TSS/IDT/Exceptions) |
 | Работающая shell | ❌ |
 | Образ диска | ❌ |
 | Версия | `0.0.1-dev` |
 | Первая веха | **M0 — «Hello, serial»** — ✅ ЗАВЕРШЕНА |
+| Вторая веха | **M1 — GDT, IDT, исключения** — ✅ ЗАВЕРШЕНА |
 
 Все пункты чек-листов в этом документе отмечены `[ ]` **по определению** — это план, а не отчёт.
 
@@ -1074,7 +1075,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | Веха | Содержание | Критерий приёмки | Статус |
 |---|---|---|---|
 | **M0** | Каркас репозитория, toolchain, Makefile, `panic`, `printk`, serial | В QEMU в serial: `AuroraOS 1.0.0 booting...` | `[x]` |
-| **M1** | MBR/Multiboot2, GDT, переход в long mode, paging, IDT, исключения | Двойное_fault не возникает; `#PF` печатает адрес | `[ ]` |
+| **M1** | MBR/Multiboot2, GDT, переход в long mode, paging, IDT, исключения | Двойное_fault не возникает; `#PF` печатает адрес | `[x]` |
 | **M2** | PMM (bitmap), VMM, direct map, heap `kmalloc/kfree` | Тест: 1 млн alloc/free без утечек | `[ ]` |
 | **M3** | PIT 100 Гц, `task_struct`, context switch, планировщик, `sched_yield` | Два цикла печатают `A`/`B` вперемешку | `[ ]` |
 | **M4** | Syscall gate (`syscall`/`int 0x80`), `write`, `exit`, `getpid`, `brk` | Пользовательский ring-3 код печатает в консоль и выходит | `[ ]` |
@@ -1336,7 +1337,7 @@ reboot: System halted
 
 ```
 [x] M0  Каркас, toolchain, printk, serial
-[ ] M1  Multiboot2, GDT, long mode, IDT, исключения
+[x] M1  Multiboot2, GDT, long mode, IDT, исключения
 [ ] M2  PMM, VMM, paging, kmalloc/kfree
 [ ] M3  PIT, task_struct, context switch, планировщик
 [ ] M4  syscall gate, write/exit/getpid/brk
