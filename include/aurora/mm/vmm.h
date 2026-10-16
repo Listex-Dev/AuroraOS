@@ -39,5 +39,7 @@ uint64_t vmm_virt_to_phys(uint64_t *pml4, uint64_t virt);
 
 void vmm_invlpg(uint64_t virt);
 uint64_t *vmm_get_kernel_pml4(void);
+uint64_t *vmm_clone_user_space(uint64_t *src_pml4);
+void vmm_destroy_user_space(uint64_t *pml4);
 
 #endif /* _AURORA_MM_VMM_H */

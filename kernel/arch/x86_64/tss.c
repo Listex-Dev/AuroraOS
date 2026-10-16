@@ -1,7 +1,7 @@
 #include <aurora/arch/x86_64/tss.h>
 #include <aurora/string.h>
 
-static tss_entry_t kernel_tss;
+tss_entry_t kernel_tss;
 
 /* Dedicated stack for Double Fault (#DF) handler to guarantee no Triple Fault */
 static uint8_t double_fault_stack[4096] __attribute__((aligned(16)));

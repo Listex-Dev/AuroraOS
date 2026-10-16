@@ -16,6 +16,7 @@
 #define SYS_execve   59
 #define SYS_exit     60
 #define SYS_wait4    61
+#define SYS_kill     62
 
 void syscall_init(void);
 
@@ -23,8 +24,14 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
 
 /* Syscall implementations */
 int64_t sys_write(int fd, const void *buf, size_t count);
+int64_t sys_read(int fd, void *buf, size_t count);
+int64_t sys_close(int fd);
 int64_t sys_exit(int status);
 int64_t sys_getpid(void);
 int64_t sys_brk(uintptr_t new_brk);
+int64_t sys_fork(void);
+int64_t sys_execve(const char *filename, char *const argv[], char *const envp[]);
+int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage);
+int64_t sys_kill(pid_t pid, int sig);
 
 #endif /* _AURORA_SYSCALL_H */

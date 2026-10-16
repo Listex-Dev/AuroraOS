@@ -1,6 +1,19 @@
 #include <aurora/syscall.h>
 #include <aurora/proc/sched.h>
+#include <aurora/proc/binaries.h>
+#include <aurora/proc/stack.h>
+#include <aurora/elf64.h>
+#include <aurora/signal.h>
+#include <aurora/mm/pmm.h>
+#include <aurora/mm/vmm.h>
+#include <aurora/mm/heap.h>
+#include <aurora/arch/x86_64/cr.h>
+#include <aurora/string.h>
 #include <aurora/printk.h>
+#include <aurora/errno.h>
+
+extern void fork_ret_trampoline(void);
+extern void enter_usermode(uint64_t rip, uint64_t rsp);
 
 int64_t sys_getpid(void)
 {
@@ -16,5 +29,273 @@ int64_t sys_exit(int status)
                curr->comm, curr->pid, status);
     }
     sched_exit(status);
+    return 0;
+}
+
+int64_t sys_fork(void)
+{
+    task_t *curr = sched_current();
+    if (!curr || !curr->regs) {
+        return -EAGAIN;
+    }
+
+    /* 1. Allocate child task struct */
+    task_t *child = (task_t *)kzalloc(sizeof(task_t), GFP_KERNEL);
+    if (!child) {
+        return -ENOMEM;
+    }
+
+    /* 2. Allocate child kernel stack (16 KiB) */
+    child->kstack = kmalloc(KERNEL_STACK_SIZE, GFP_KERNEL);
+    if (!child->kstack) {
+        kfree(child);
+        return -ENOMEM;
+    }
+
+    /* 3. Clone user address space (PML4) */
+    uint64_t *src_pml4 = curr->pml4 ? curr->pml4 : vmm_get_kernel_pml4();
+    child->pml4 = vmm_clone_user_space(src_pml4);
+    if (!child->pml4) {
+        kfree(child->kstack);
+        kfree(child);
+        return -ENOMEM;
+    }
+    child->cr3 = vmm_virt_to_phys_direct(child->pml4);
+
+    /* 4. Setup child process metadata */
+    child->pid = sched_allocate_pid();
+    child->ppid = curr->pid;
+    child->state = TASK_RUNNING;
+    child->time_slice = DEFAULT_TIME_SLICE;
+    child->parent = curr;
+    child->brk_start = curr->brk_start;
+    child->brk_current = curr->brk_current;
+    strncpy(child->comm, curr->comm, sizeof(child->comm) - 1);
+
+    /* 5. Setup child kernel stack and pt_regs */
+    struct pt_regs *child_regs = (struct pt_regs *)((uintptr_t)child->kstack + KERNEL_STACK_SIZE - sizeof(struct pt_regs));
+    memcpy(child_regs, curr->regs, sizeof(struct pt_regs));
+    child_regs->orig_rax = 0; /* In child process, fork() returns 0 */
+
+    /* Setup stack frame for cpu_switch_to */
+    uint64_t *sp = (uint64_t *)child_regs;
+    *(--sp) = (uint64_t)fork_ret_trampoline; /* Return address for ret in cpu_switch_to */
+    *(--sp) = 0; /* r15 */
+    *(--sp) = 0; /* r14 */
+    *(--sp) = 0; /* r13 */
+    *(--sp) = 0; /* r12 */
+    *(--sp) = 0; /* rbp */
+    *(--sp) = 0; /* rbx */
+
+    child->rsp = (uint64_t)sp;
+    child->regs = child_regs;
+
+    /* 6. Enqueue child task in scheduler */
+    sched_add_task(child);
+
+    printk("<6>[FORK] Parent PID %d ('%s') forked child PID %d\n",
+           curr->pid, curr->comm, child->pid);
+
+    /* 7. Return child PID to parent */
+    return child->pid;
+}
+
+int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
+{
+    task_t *curr = sched_current();
+    if (!curr || !filename) {
+        return -EINVAL;
+    }
+
+    char kfilename[64];
+    strncpy(kfilename, filename, sizeof(kfilename) - 1);
+    kfilename[sizeof(kfilename) - 1] = '\0';
+
+    size_t binary_size = 0;
+    const void *elf_data = find_builtin_binary(kfilename, &binary_size);
+    if (!elf_data) {
+        printk("<4>[EXECVE] Binary not found: %s\n", kfilename);
+        return -ENOENT;
+    }
+
+    /* 1. Create clean user address space */
+    uintptr_t new_pml4_phys = pmm_alloc_page();
+    if (!new_pml4_phys) {
+        return -ENOMEM;
+    }
+    uint64_t *new_pml4 = (uint64_t *)vmm_phys_to_virt(new_pml4_phys);
+    memset(new_pml4, 0, PAGE_SIZE);
+
+    /* Share upper half kernel mappings */
+    uint64_t *k_pml4 = vmm_get_kernel_pml4();
+    for (size_t i = 256; i < 512; i++) {
+        new_pml4[i] = k_pml4[i];
+    }
+
+    /* Switch to new PML4 */
+    uint64_t new_cr3 = new_pml4_phys;
+    write_cr3(new_cr3);
+
+    /* 2. Load ELF binary into new PML4 */
+    uint64_t entry_point = 0;
+    uint64_t brk_start = 0;
+    int ret = elf64_load_pml4(new_pml4, elf_data, binary_size, &entry_point, &brk_start);
+    if (ret < 0) {
+        printk("<3>[EXECVE] Failed to load ELF %s: %d\n", filename, ret);
+        return ret;
+    }
+
+    /* 3. Allocate and map user stack (16 KiB = 4 pages) */
+    #define USER_STACK_TOP 0x00007FFFF0000000ULL
+    #define USER_STACK_PAGES 4
+    for (uint64_t p = 0; p < USER_STACK_PAGES; p++) {
+        uintptr_t stack_phys = pmm_alloc_page();
+        if (!stack_phys) {
+            return -ENOMEM;
+        }
+        memset(vmm_phys_to_virt(stack_phys), 0, PAGE_SIZE);
+        vmm_map_page(new_pml4,
+                     USER_STACK_TOP - (p + 1) * PAGE_SIZE,
+                     stack_phys,
+                     PTE_USER | PTE_WRITABLE);
+    }
+
+    /* 4. Count argv arguments */
+    int argc = 0;
+    if (argv) {
+        while (argv[argc] != NULL) {
+            argc++;
+        }
+    }
+
+    /* 5. Construct System V AMD64 ABI user stack */
+    uint64_t user_sp = setup_user_stack(USER_STACK_TOP, argc, (char **)argv, (char **)envp, entry_point);
+
+    /* 6. Free previous user space if custom */
+    if (curr->pml4 && curr->pml4 != k_pml4) {
+        vmm_destroy_user_space(curr->pml4);
+    }
+
+    curr->pml4 = new_pml4;
+    curr->cr3 = new_cr3;
+    curr->brk_start = brk_start;
+    curr->brk_current = brk_start;
+
+    /* Extract basename for comm */
+    const char *base = kfilename;
+    for (const char *p = kfilename; *p; p++) {
+        if (*p == '/') {
+            base = p + 1;
+        }
+    }
+    strncpy(curr->comm, base, sizeof(curr->comm) - 1);
+
+    printk("<6>[EXECVE] Process PID %d executing '%s': entry=%p, rsp=%p, argc=%d\n",
+           curr->pid, curr->comm, (void *)entry_point, (void *)user_sp, argc);
+
+    /* 7. Reset user registers to start executing the new program */
+    if (curr->regs) {
+        memset(curr->regs, 0, sizeof(struct pt_regs));
+        curr->regs->rip = entry_point;
+        curr->regs->rsp = user_sp;
+        curr->regs->cs = 0x23;
+        curr->regs->ss = 0x1B;
+        curr->regs->rflags = 0x202; /* IF enabled */
+        curr->regs->orig_rax = 0;
+        return 0; /* Returns via syscall_return_to_user directly into entry_point */
+    }
+
+    enter_usermode(entry_point, user_sp);
+    return 0;
+}
+
+int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage)
+{
+    (void)rusage;
+    task_t *curr = sched_current();
+    if (!curr) {
+        return -ESRCH;
+    }
+
+    while (1) {
+        bool has_children = false;
+        task_t *zombie = NULL;
+
+        for (size_t i = 0; i < sched_num_tasks(); i++) {
+            task_t *t = sched_get_task_at(i);
+            if (!t || t->ppid != curr->pid) {
+                continue;
+            }
+
+            if (pid > 0 && t->pid != pid) {
+                continue;
+            }
+
+            has_children = true;
+
+            if (t->state == TASK_ZOMBIE) {
+                zombie = t;
+                break;
+            }
+        }
+
+        if (!has_children) {
+            return -ECHILD;
+        }
+
+        if (zombie) {
+            pid_t reaped_pid = zombie->pid;
+            int exit_status = (zombie->exit_code & 0xFF) << 8;
+
+            if (status) {
+                *status = exit_status;
+            }
+
+            printk("<6>[WAIT4] Parent PID %d reaped child PID %d (exit code %d)\n",
+                   curr->pid, reaped_pid, zombie->exit_code);
+
+            sched_remove_task(zombie);
+            if (zombie->pml4 && zombie->pml4 != vmm_get_kernel_pml4()) {
+                vmm_destroy_user_space(zombie->pml4);
+            }
+            task_destroy(zombie);
+
+            return reaped_pid;
+        }
+
+        if (options & WNOHANG) {
+            return 0;
+        }
+
+        /* Yield until child state changes */
+        sched_yield();
+    }
+}
+
+int64_t sys_kill(pid_t pid, int sig)
+{
+    if (sig < 0 || sig >= NSIG) {
+        return -EINVAL;
+    }
+
+    task_t *target = sched_find_task(pid);
+    if (!target) {
+        return -ESRCH;
+    }
+
+    if (sig == 0) {
+        return 0; /* Process existence probe */
+    }
+
+    printk("<6>[SIGNAL] Sent signal %d to PID %d ('%s')\n",
+           sig, target->pid, target->comm);
+
+    /* Default terminating signals: terminate target and set zombie status */
+    if (sig == SIGKILL || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT) {
+        target->exit_code = 128 + sig;
+        target->state = TASK_ZOMBIE;
+        return 0;
+    }
+
     return 0;
 }

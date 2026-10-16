@@ -41,25 +41,39 @@ C_SRCS  := kernel/main.c \
            kernel/syscall/sys_file.c \
            kernel/syscall/sys_proc.c \
            kernel/syscall/sys_mm.c \
-           kernel/proc/m4_test.c
+           kernel/proc/m4_test.c \
+           kernel/proc/elf.c \
+           kernel/proc/stack.c \
+           kernel/proc/binaries.c \
+           kernel/proc/m5_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
             kernel/arch/x86_64/context.S \
             kernel/arch/x86_64/syscall_entry.S \
-            kernel/proc/user_test.S
+            kernel/proc/user_test.S \
+            kernel/proc/user_m5.S \
+            kernel/proc/builtin_binaries.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 
 TARGET_ELF := $(BUILD_DIR)/aurora.elf
 TARGET_BIN := $(BUILD_DIR)/aurora.bin
+HELLO_ELF  := $(BUILD_DIR)/hello.elf
 
 .PHONY: all kernel run debug test clean
 
 all: kernel
 
 kernel: $(TARGET_ELF) $(TARGET_BIN)
+
+$(HELLO_ELF): user/hello.S
+	@mkdir -p $(dir $@)
+	@echo "  CC      $< -> $@"
+	@$(CC) -nostdlib -static -fno-pie -no-pie $< -o $@
+
+$(BUILD_DIR)/kernel/proc/builtin_binaries.o: $(HELLO_ELF)
 
 $(TARGET_ELF): $(OBJS) boot/linker.ld
 	@mkdir -p $(dir $@)
@@ -109,13 +123,13 @@ test: $(TARGET_BIN)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M4 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M5 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M4 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M5 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M4 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M5 verification failed! <<<"; \
 		exit 1; \
 	fi
 

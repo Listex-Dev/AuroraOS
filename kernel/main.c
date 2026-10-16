@@ -19,6 +19,7 @@
 #include <aurora/proc/m3_test.h>
 #include <aurora/syscall.h>
 #include <aurora/proc/m4_test.h>
+#include <aurora/proc/m5_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -86,6 +87,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* Run Milestone M4 verification */
     test_usermode_syscall();
+
+    /* --- Milestone M5: fork, execve (ELF64), wait4, signals --- */
+    test_fork_execve_wait();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

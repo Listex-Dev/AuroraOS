@@ -1,11 +1,10 @@
 #include <aurora/proc/task.h>
+#include <aurora/proc/sched.h>
 #include <aurora/mm/heap.h>
 #include <aurora/string.h>
 #include <aurora/printk.h>
 
 extern void task_trampoline(void);
-
-static pid_t next_pid = 1;
 
 task_t *task_create(const char *name, void (*entry_point)(void))
 {
@@ -20,7 +19,7 @@ task_t *task_create(const char *name, void (*entry_point)(void))
         return NULL;
     }
 
-    task->pid = next_pid++;
+    task->pid = sched_allocate_pid();
     task->state = TASK_RUNNING;
     task->time_slice = DEFAULT_TIME_SLICE;
     strncpy(task->comm, name ? name : "kthread", sizeof(task->comm) - 1);

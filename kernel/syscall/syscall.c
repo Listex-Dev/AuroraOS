@@ -1,10 +1,19 @@
 #include <aurora/syscall.h>
 #include <aurora/arch/x86_64/msr.h>
 #include <aurora/arch/x86_64/interrupts.h>
+#include <aurora/proc/sched.h>
 #include <aurora/errno.h>
 #include <aurora/printk.h>
 
 extern void syscall_entry(void);
+
+void syscall_save_regs(struct pt_regs *regs)
+{
+    task_t *curr = sched_current();
+    if (curr) {
+        curr->regs = regs;
+    }
+}
 
 /* Handler for int 0x80 compatibility */
 static void int80_handler(interrupt_frame_t *frame)
@@ -17,7 +26,7 @@ static void int80_handler(interrupt_frame_t *frame)
 
 int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6)
 {
-    (void)a4; (void)a5; (void)a6;
+    (void)a5; (void)a6;
 
     switch (num) {
         case SYS_write:
@@ -28,6 +37,14 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_getpid();
         case SYS_brk:
             return sys_brk((uintptr_t)a1);
+        case SYS_fork:
+            return sys_fork();
+        case SYS_execve:
+            return sys_execve((const char *)a1, (char *const *)a2, (char *const *)a3);
+        case SYS_wait4:
+            return sys_wait4((pid_t)a1, (int *)a2, (int)a3, (void *)a4);
+        case SYS_kill:
+            return sys_kill((pid_t)a1, (int)a2);
         default:
             printk("<4>[SYSCALL] Unimplemented syscall %llu\n", (unsigned long long)num);
             return -ENOSYS;

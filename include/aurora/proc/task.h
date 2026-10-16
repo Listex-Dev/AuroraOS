@@ -13,6 +13,28 @@
 #define KERNEL_STACK_SIZE    16384 /* 16 KiB kernel stack per task */
 #define DEFAULT_TIME_SLICE   5     /* 5 ticks = 50 ms */
 
+struct pt_regs {
+    uint64_t r15;
+    uint64_t r14;
+    uint64_t r13;
+    uint64_t r12;
+    uint64_t rbp;
+    uint64_t rbx;
+    uint64_t r11;
+    uint64_t r10;
+    uint64_t r9;
+    uint64_t r8;
+    uint64_t rdx;
+    uint64_t rsi;
+    uint64_t rdi;
+    uint64_t orig_rax;
+    uint64_t rip;
+    uint64_t cs;
+    uint64_t rflags;
+    uint64_t rsp;
+    uint64_t ss;
+};
+
 struct task_struct {
     /* Context switch: rsp must be at known offset */
     uint64_t rsp;
@@ -30,6 +52,9 @@ struct task_struct {
     int state;
 
     void *mm;
+    uint64_t cr3;
+    uint64_t *pml4;
+    struct pt_regs *regs;
     void *files;
     void *fs;
     void *sig;

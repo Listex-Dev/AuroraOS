@@ -2,6 +2,8 @@
 #include <aurora/printk.h>
 #include <aurora/io.h>
 #include <aurora/string.h>
+#include <aurora/arch/x86_64/cr.h>
+#include <aurora/mm/vmm.h>
 
 #define MAX_TASKS 64
 
@@ -11,6 +13,25 @@ static size_t current_idx = 0;
 
 static task_t kernel_idle_task;
 static task_t *g_current_task = NULL;
+static pid_t g_next_pid = 1;
+
+pid_t sched_allocate_pid(void)
+{
+    return g_next_pid++;
+}
+
+size_t sched_num_tasks(void)
+{
+    return num_tasks;
+}
+
+task_t *sched_get_task_at(size_t index)
+{
+    if (index < num_tasks) {
+        return runqueue[index];
+    }
+    return NULL;
+}
 
 void sched_init(void)
 {
@@ -36,9 +57,48 @@ void sched_add_task(task_t *task)
     }
 }
 
+void sched_remove_task(task_t *task)
+{
+    for (size_t i = 0; i < num_tasks; i++) {
+        if (runqueue[i] == task) {
+            for (size_t j = i; j < num_tasks - 1; j++) {
+                runqueue[j] = runqueue[j + 1];
+            }
+            num_tasks--;
+            if (current_idx >= num_tasks && num_tasks > 0) {
+                current_idx = 0;
+            }
+            break;
+        }
+    }
+}
+
 task_t *sched_current(void)
 {
     return g_current_task;
+}
+
+task_t *sched_find_task(pid_t pid)
+{
+    for (size_t i = 0; i < num_tasks; i++) {
+        if (runqueue[i] && runqueue[i]->pid == pid) {
+            return runqueue[i];
+        }
+    }
+    return NULL;
+}
+
+task_t *sched_find_child(pid_t ppid, pid_t pid)
+{
+    for (size_t i = 0; i < num_tasks; i++) {
+        task_t *t = runqueue[i];
+        if (t && t->ppid == ppid) {
+            if (pid <= 0 || t->pid == pid) {
+                return t;
+            }
+        }
+    }
+    return NULL;
 }
 
 void sched_yield(void)
@@ -68,6 +128,13 @@ void sched_yield(void)
 
     current_idx = next_idx;
     g_current_task = next;
+
+    /* Switch CR3 address space if task has a distinct PML4 */
+    if (next->cr3 && next->cr3 != read_cr3()) {
+        write_cr3(next->cr3);
+    } else if (!next->cr3 && read_cr3() != vmm_virt_to_phys_direct(vmm_get_kernel_pml4())) {
+        write_cr3(vmm_virt_to_phys_direct(vmm_get_kernel_pml4()));
+    }
 
     cpu_switch_to(prev, next);
 }
