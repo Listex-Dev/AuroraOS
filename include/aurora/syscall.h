@@ -20,8 +20,11 @@
 #define SYS_exit     60
 #define SYS_wait4    61
 #define SYS_kill     62
-#define SYS_mkdir    83
-#define SYS_unlink   87
+#define SYS_mkdir      83
+#define SYS_unlink     87
+#define SYS_pivot_root 155
+#define SYS_mount      165
+#define SYS_umount2    166
 
 struct stat;
 
@@ -48,5 +51,7 @@ int64_t sys_fork(void);
 int64_t sys_execve(const char *filename, char *const argv[], char *const envp[]);
 int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage);
 int64_t sys_kill(pid_t pid, int sig);
+int64_t sys_pivot_root(const char *new_root, const char *put_old);
+int64_t sys_mount(const char *dev_name, const char *dir_name, const char *type, unsigned long flags, const void *data);
 
 #endif /* _AURORA_SYSCALL_H */

@@ -23,6 +23,7 @@
 #include <aurora/fs/vfs.h>
 #include <aurora/fs/m6_test.h>
 #include <aurora/fs/m7_test.h>
+#include <aurora/fs/m8_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -102,6 +103,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* --- Milestone M7: Virtual Filesystems verification (ramfs+cpio, procfs, devtmpfs, tmpfs, sysfs) --- */
     test_virtual_filesystems();
+
+    /* --- Milestone M8: ext2/ext4 R/W, mkfs, fsck, pivot_root, fstab --- */
+    test_ext4_root_subsystem();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

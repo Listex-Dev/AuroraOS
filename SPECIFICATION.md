@@ -1085,7 +1085,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M5** | `fork`, `wait4`, `execve` (ELF64), стек `argv/envp/auxv`, сигналы | Программа делает `fork` → `execve("/bin/hello")` → `wait4` → код возврата | `[x]` |
 | **M6** | VFS: `inode/dentry/file`, namei, `open/read/write/close/lseek/stat` | Файлы в `ramfs` читаются/пишутся | `[x]` |
 | **M7** | `ramfs` + initrd + `cpio`; `procfs`; `devtmpfs`; `tmpfs`; `sysfs` | `/proc/meminfo`, `/dev/console`, `/tmp` работают | `[x]` |
-| **M8** | **`ext2/ext4` R/W**, `mkfs`, `fsck`, монтирование корня, `pivot_root`, `/etc/fstab` | Загрузка с диска, корень — ext4, файлы переживают перезагрузку | `[ ]` |
+| **M8** | **`ext2/ext4` R/W**, `mkfs`, `fsck`, монтирование корня, `pivot_root`, `/etc/fstab` | Загрузка с диска, корень — ext4, файлы переживают перезагрузку | `[x]` |
 | **M9** | TTY: line discipline, VT0–5, kbd, `termios`, canonical/raw, `Ctrl-C` | `Ctrl-C` убивает foreground-процесс; `vi` работает в raw | `[ ]` |
 | **M10** | libc полная + `crt0` + сборка user-утилит | `ls`, `cat`, `cp`, `ps`, `vi`, `grep` собраны и работают | `[ ]` |
 | **M11** | `/bin/sh` с конвейерами, редиректами, job control; `init` (PID 1) + `getty` + `login` | **Полный сценарий: power-on → `aurora login:` → `root` → shell** | `[ ]` |

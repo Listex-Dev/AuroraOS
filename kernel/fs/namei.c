@@ -95,7 +95,13 @@ struct dentry *vfs_namei_parent(const char *path, char *last_comp)
             strncpy(last_comp, last_slash + 1, 127);
             last_comp[127] = '\0';
         }
-        return vfs_get_root();
+        task_t *task = sched_current();
+        struct fs_struct *fs = task ? (struct fs_struct *)task->fs : NULL;
+        struct dentry *r = (fs && fs->root) ? fs->root : vfs_get_root();
+        if (r && r->d_mounted) {
+            r = r->d_mounted->mnt_root;
+        }
+        return r;
     }
 
     /* Copy parent path into temporary buffer */

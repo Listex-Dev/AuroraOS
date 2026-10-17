@@ -43,6 +43,11 @@ struct dentry *vfs_get_root(void)
     return root_sb ? root_sb->s_root : NULL;
 }
 
+void vfs_set_root(struct super_block *sb)
+{
+    root_sb = sb;
+}
+
 void vfs_init(void)
 {
     root_sb = ramfs_create();

@@ -59,7 +59,14 @@ C_SRCS  := kernel/main.c \
            kernel/fs/sysfs.c \
            kernel/fs/cpio.c \
            kernel/fs/m6_test.c \
-           kernel/fs/m7_test.c
+           kernel/fs/m7_test.c \
+           kernel/drivers/block.c \
+           kernel/drivers/ata.c \
+           kernel/drivers/ramdisk.c \
+           kernel/fs/ext2.c \
+           kernel/fs/ext2_mkfs.c \
+           kernel/fs/ext2_fsck.c \
+           kernel/fs/m8_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -69,20 +76,26 @@ ASM_SRCS := boot/boot.S \
             kernel/proc/user_m5.S \
             kernel/proc/builtin_binaries.S \
             kernel/fs/user_vfs.S \
-            kernel/fs/user_m7.S
+            kernel/fs/user_m7.S \
+            kernel/fs/user_m8.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 
 TARGET_ELF := $(BUILD_DIR)/aurora.elf
 TARGET_BIN := $(BUILD_DIR)/aurora.bin
+DISK_IMG   := $(BUILD_DIR)/aurora.img
 HELLO_ELF  := $(BUILD_DIR)/hello.elf
 
 .PHONY: all kernel run debug test clean
 
 all: kernel
 
-kernel: $(TARGET_ELF) $(TARGET_BIN)
+kernel: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
+
+$(DISK_IMG):
+	@mkdir -p $(dir $@)
+	@dd if=/dev/zero of=$@ bs=1M count=64 status=none
 
 $(HELLO_ELF): user/hello.S
 	@mkdir -p $(dir $@)
@@ -111,41 +124,44 @@ $(BUILD_DIR)/%.o: %.S
 	@echo "  AS      $<"
 	@$(AS) $(ASFLAGS) $< -o $@
 
-run: $(TARGET_BIN)
+run: $(TARGET_BIN) $(DISK_IMG)
 	@echo "Starting AuroraOS in QEMU (press Ctrl-A then X to exit)..."
 	qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
+		-drive file=$(DISK_IMG),format=raw,if=ide \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown
 
-debug: $(TARGET_ELF) $(TARGET_BIN)
+debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 	@echo "Starting AuroraOS in debug mode (GDB port :1234)..."
 	qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
+		-drive file=$(DISK_IMG),format=raw,if=ide \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown \
 		-s -S
 
-test: $(TARGET_BIN)
+test: $(TARGET_BIN) $(DISK_IMG)
 	@echo "Running Milestone automated acceptance test..."
-	@output=$$(timeout 8s qemu-system-x86_64 \
+	@output=$$(timeout 10s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
+		-drive file=$(DISK_IMG),format=raw,if=ide \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M7 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M8 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M7 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M8 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M7 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M8 verification failed! <<<"; \
 		exit 1; \
 	fi
 

@@ -124,6 +124,7 @@ struct fs_struct {
 void vfs_init(void);
 
 struct dentry *vfs_get_root(void);
+void vfs_set_root(struct super_block *sb);
 struct files_struct *files_alloc(void);
 struct files_struct *files_clone(struct files_struct *old_files);
 void files_free(struct files_struct *files);

@@ -1,5 +1,6 @@
 #include <aurora/syscall.h>
 #include <aurora/fs/vfs.h>
+#include <aurora/fs/mount.h>
 #include <aurora/proc/sched.h>
 #include <aurora/errno.h>
 
@@ -194,4 +195,14 @@ int64_t sys_mkdir(const char *pathname, mode_t mode)
 int64_t sys_unlink(const char *pathname)
 {
     return vfs_unlink(pathname);
+}
+
+int64_t sys_pivot_root(const char *new_root, const char *put_old)
+{
+    return vfs_pivot_root(new_root, put_old);
+}
+
+int64_t sys_mount(const char *dev_name, const char *dir_name, const char *type, unsigned long flags, const void *data)
+{
+    return vfs_mount(dev_name, dir_name, type, (uint32_t)flags, data);
 }

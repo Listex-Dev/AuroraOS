@@ -37,5 +37,6 @@
 #define EDOM            33      /* Math argument out of domain */
 #define ERANGE          34      /* Math result not representable */
 #define ENOSYS          38      /* Function not implemented */
+#define ETIMEDOUT       110     /* Connection timed out */
 
 #endif /* _AURORA_ERRNO_H */

@@ -60,19 +60,24 @@ void *kmalloc(size_t size, uint32_t flags)
         if (!slab_heads[slab_idx]) {
             /* Need more pages for this slab */
             size_t block_size = sizeof(struct alloc_header) + slab_sizes[slab_idx];
-            size_t blocks_per_page = PAGE_SIZE / block_size;
-            if (blocks_per_page == 0) {
-                blocks_per_page = 1;
+            size_t pages_per_slab = (block_size + PAGE_SIZE - 1) / PAGE_SIZE;
+            if (pages_per_slab == 0) {
+                pages_per_slab = 1;
+            }
+            size_t total_slab_bytes = pages_per_slab * PAGE_SIZE;
+            size_t blocks_per_slab = total_slab_bytes / block_size;
+            if (blocks_per_slab == 0) {
+                blocks_per_slab = 1;
             }
 
-            uintptr_t phys = pmm_alloc_page();
+            uintptr_t phys = (pages_per_slab == 1) ? pmm_alloc_page() : pmm_alloc_pages(pages_per_slab);
             if (!phys) {
                 return NULL; /* OOM */
             }
 
             uint8_t *page = (uint8_t *)vmm_phys_to_virt(phys);
 
-            for (size_t b = 0; b < blocks_per_page; b++) {
+            for (size_t b = 0; b < blocks_per_slab; b++) {
                 uint8_t *block = page + (b * block_size);
                 struct slab_free_node *node = (struct slab_free_node *)block;
                 node->next = slab_heads[slab_idx];

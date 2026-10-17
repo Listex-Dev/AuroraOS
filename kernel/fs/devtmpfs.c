@@ -132,6 +132,31 @@ int devtmpfs_register_chrdev(uint32_t major, uint32_t minor, const char *name,
     return 0;
 }
 
+int devtmpfs_register_blkdev(uint32_t major, uint32_t minor, const char *name,
+                            struct file_operations *fops, mode_t mode)
+{
+    if (!dev_sb || !name || !fops) {
+        return -EINVAL;
+    }
+
+    struct inode *inode = inode_alloc(dev_sb);
+    if (!inode) {
+        return -ENOMEM;
+    }
+
+    inode->i_mode = S_IFBLK | (mode & 0777);
+    inode->i_fop = fops;
+    inode->i_rdev = (major << 8) | (minor & 0xFF);
+
+    struct dentry *d = dentry_create(name, dev_sb->s_root, inode);
+    if (!d) {
+        inode_free(inode);
+        return -ENOMEM;
+    }
+
+    return 0;
+}
+
 struct super_block *devtmpfs_create(void)
 {
     struct super_block *sb = (struct super_block *)kzalloc(sizeof(struct super_block), GFP_KERNEL);
