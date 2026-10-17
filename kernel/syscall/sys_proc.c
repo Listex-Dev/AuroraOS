@@ -66,6 +66,9 @@ int64_t sys_fork(void)
     /* 4. Setup child process metadata */
     child->pid = sched_allocate_pid();
     child->ppid = curr->pid;
+    child->pgid = curr->pgid;
+    child->sid = curr->sid;
+    child->tty = curr->tty;
     child->state = TASK_RUNNING;
     child->time_slice = DEFAULT_TIME_SLICE;
     child->parent = curr;
@@ -262,7 +265,12 @@ int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage)
 
         if (zombie) {
             pid_t reaped_pid = zombie->pid;
-            int exit_status = (zombie->exit_code & 0xFF) << 8;
+            int exit_status;
+            if (zombie->exit_code >= 128) {
+                exit_status = (zombie->exit_code - 128) & 0x7F;
+            } else {
+                exit_status = (zombie->exit_code & 0xFF) << 8;
+            }
 
             if (status) {
                 *status = exit_status;
@@ -295,6 +303,33 @@ int64_t sys_kill(pid_t pid, int sig)
         return -EINVAL;
     }
 
+    if (pid < 0) {
+        /* Signal process group */
+        pid_t pgrp = -pid;
+        int count = 0;
+        for (size_t i = 0; i < sched_num_tasks(); i++) {
+            task_t *t = sched_get_task_at(i);
+            if (t && t->pgid == pgrp && t->state != TASK_ZOMBIE && t->state != TASK_DEAD) {
+                if (sig > 0) {
+                    printk("<6>[SIGNAL] Sent signal %d to PID %d ('%s', pgrp %d)\n",
+                           sig, t->pid, t->comm, pgrp);
+                    if (sig == SIGKILL || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT) {
+                        t->exit_code = 128 + sig;
+                        t->state = TASK_ZOMBIE;
+                    }
+                }
+                count++;
+            }
+        }
+        return count > 0 ? 0 : -ESRCH;
+    }
+
+    if (pid == 0) {
+        task_t *curr = sched_current();
+        if (!curr) return -ESRCH;
+        return sys_kill(-(curr->pgid ? curr->pgid : curr->pid), sig);
+    }
+
     task_t *target = sched_find_task(pid);
     if (!target) {
         return -ESRCH;
@@ -316,3 +351,4 @@ int64_t sys_kill(pid_t pid, int sig)
 
     return 0;
 }
+

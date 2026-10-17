@@ -24,6 +24,7 @@
 #include <aurora/fs/m6_test.h>
 #include <aurora/fs/m7_test.h>
 #include <aurora/fs/m8_test.h>
+#include <aurora/drivers/m9_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -106,6 +107,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* --- Milestone M8: ext2/ext4 R/W, mkfs, fsck, pivot_root, fstab --- */
     test_ext4_root_subsystem();
+
+    /* --- Milestone M9: TTY line discipline, VT0-5, kbd, termios, Ctrl-C --- */
+    test_tty_subsystem();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

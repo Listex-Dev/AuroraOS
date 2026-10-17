@@ -66,7 +66,11 @@ C_SRCS  := kernel/main.c \
            kernel/fs/ext2.c \
            kernel/fs/ext2_mkfs.c \
            kernel/fs/ext2_fsck.c \
-           kernel/fs/m8_test.c
+           kernel/fs/m8_test.c \
+           kernel/drivers/console.c \
+           kernel/drivers/tty.c \
+           kernel/drivers/kbd.c \
+           kernel/drivers/m9_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -77,7 +81,8 @@ ASM_SRCS := boot/boot.S \
             kernel/proc/builtin_binaries.S \
             kernel/fs/user_vfs.S \
             kernel/fs/user_m7.S \
-            kernel/fs/user_m8.S
+            kernel/fs/user_m8.S \
+            kernel/drivers/user_m9.S
 
 OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS)) \
         $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
@@ -155,13 +160,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M8 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M9 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M8 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M9 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M8 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M9 verification failed! <<<"; \
 		exit 1; \
 	fi
 

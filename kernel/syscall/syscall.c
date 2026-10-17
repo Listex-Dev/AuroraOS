@@ -43,6 +43,8 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_fstat((int)a1, (struct stat *)a2);
         case SYS_lseek:
             return sys_lseek((int)a1, (uint64_t)a2, (int)a3);
+        case SYS_ioctl:
+            return sys_ioctl((int)a1, (unsigned long)a2, (void *)a3);
         case SYS_dup:
             return sys_dup((int)a1);
         case SYS_dup2:

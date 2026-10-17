@@ -12,6 +12,7 @@
 #define SYS_fstat    5
 #define SYS_lseek    8
 #define SYS_brk      12
+#define SYS_ioctl    16
 #define SYS_dup      32
 #define SYS_dup2     33
 #define SYS_getpid   39
@@ -53,5 +54,6 @@ int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage);
 int64_t sys_kill(pid_t pid, int sig);
 int64_t sys_pivot_root(const char *new_root, const char *put_old);
 int64_t sys_mount(const char *dev_name, const char *dir_name, const char *type, unsigned long flags, const void *data);
+int64_t sys_ioctl(int fd, unsigned long cmd, void *arg);
 
 #endif /* _AURORA_SYSCALL_H */

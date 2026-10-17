@@ -206,3 +206,23 @@ int64_t sys_mount(const char *dev_name, const char *dir_name, const char *type, 
 {
     return vfs_mount(dev_name, dir_name, type, (uint32_t)flags, data);
 }
+
+int64_t sys_ioctl(int fd, unsigned long cmd, void *arg)
+{
+    if (fd < 0 || fd >= NR_OPEN) {
+        return -EBADF;
+    }
+
+    struct files_struct *files = get_current_files();
+    if (!files || !files->fd[fd]) {
+        return -EBADF;
+    }
+
+    struct file *file = files->fd[fd];
+    if (file->f_op && file->f_op->ioctl) {
+        return file->f_op->ioctl(file, (unsigned int)cmd, (unsigned long)arg);
+    }
+
+    return -ENOTTY;
+}
+

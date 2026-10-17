@@ -78,6 +78,11 @@ bool test_ext4_root_subsystem(void)
     /* 5. Create directories and files on ext4 */
     sys_mkdir("/mnt/etc", 0755);
     sys_mkdir("/mnt/data", 0755);
+    sys_mkdir("/mnt/dev", 0755);
+    sys_mkdir("/mnt/proc", 0555);
+    sys_mkdir("/mnt/sys", 0755);
+    sys_mkdir("/mnt/tmp", 0777);
+    sys_mkdir("/mnt/run", 0755);
     sys_mkdir("/mnt/old_root", 0755);
 
     /* Write /mnt/etc/fstab */

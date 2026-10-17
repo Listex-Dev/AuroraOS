@@ -21,6 +21,8 @@ task_t *task_create(const char *name, void (*entry_point)(void))
     }
 
     task->pid = sched_allocate_pid();
+    task->pgid = task->pid;
+    task->sid = task->pid;
     task->state = TASK_RUNNING;
     task->time_slice = DEFAULT_TIME_SLICE;
     strncpy(task->comm, name ? name : "kthread", sizeof(task->comm) - 1);

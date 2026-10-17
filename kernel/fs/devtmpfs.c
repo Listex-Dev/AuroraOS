@@ -114,6 +114,16 @@ int devtmpfs_register_chrdev(uint32_t major, uint32_t minor, const char *name,
         return -EINVAL;
     }
 
+    /* Update existing device node if present */
+    for (struct dentry *c = dev_sb->s_root->d_subdirs; c != NULL; c = c->d_next) {
+        if (strcmp(c->d_name, name) == 0 && c->d_inode) {
+            c->d_inode->i_mode = S_IFCHR | (mode & 0777);
+            c->d_inode->i_fop = fops;
+            c->d_inode->i_rdev = (major << 8) | (minor & 0xFF);
+            return 0;
+        }
+    }
+
     struct inode *inode = inode_alloc(dev_sb);
     if (!inode) {
         return -ENOMEM;
@@ -137,6 +147,16 @@ int devtmpfs_register_blkdev(uint32_t major, uint32_t minor, const char *name,
 {
     if (!dev_sb || !name || !fops) {
         return -EINVAL;
+    }
+
+    /* Update existing device node if present */
+    for (struct dentry *c = dev_sb->s_root->d_subdirs; c != NULL; c = c->d_next) {
+        if (strcmp(c->d_name, name) == 0 && c->d_inode) {
+            c->d_inode->i_mode = S_IFBLK | (mode & 0777);
+            c->d_inode->i_fop = fops;
+            c->d_inode->i_rdev = (major << 8) | (minor & 0xFF);
+            return 0;
+        }
     }
 
     struct inode *inode = inode_alloc(dev_sb);
