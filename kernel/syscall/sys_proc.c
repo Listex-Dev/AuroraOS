@@ -11,6 +11,7 @@
 #include <aurora/fs/vfs.h>
 #include <aurora/string.h>
 #include <aurora/printk.h>
+#include <aurora/arch/x86_64/pit.h>
 #include <aurora/errno.h>
 
 extern void fork_ret_trampoline(void);
@@ -20,6 +21,71 @@ int64_t sys_getpid(void)
 {
     task_t *curr = sched_current();
     return curr ? curr->pid : 0;
+}
+
+int64_t sys_getppid(void)
+{
+    task_t *curr = sched_current();
+    return curr ? curr->ppid : 0;
+}
+
+int64_t sys_getuid(void)
+{
+    task_t *curr = sched_current();
+    return curr ? curr->uid : 0;
+}
+
+int64_t sys_getgid(void)
+{
+    task_t *curr = sched_current();
+    return curr ? curr->gid : 0;
+}
+
+int64_t sys_geteuid(void)
+{
+    task_t *curr = sched_current();
+    return curr ? curr->euid : 0;
+}
+
+int64_t sys_getegid(void)
+{
+    task_t *curr = sched_current();
+    return curr ? curr->egid : 0;
+}
+
+int64_t sys_setuid(uid_t uid)
+{
+    task_t *curr = sched_current();
+    if (curr) {
+        curr->uid = uid;
+        curr->euid = uid;
+    }
+    return 0;
+}
+
+int64_t sys_setgid(gid_t gid)
+{
+    task_t *curr = sched_current();
+    if (curr) {
+        curr->gid = gid;
+        curr->egid = gid;
+    }
+    return 0;
+}
+
+int64_t sys_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    (void)rem;
+    if (!req) return -EFAULT;
+    uint64_t ticks_to_wait = (req->tv_sec * 100) + (req->tv_nsec / 10000000ULL);
+    if (ticks_to_wait == 0 && (req->tv_sec > 0 || req->tv_nsec > 0)) {
+        ticks_to_wait = 1;
+    }
+    uint64_t target_ticks = pit_get_ticks() + ticks_to_wait;
+    while (pit_get_ticks() < target_ticks) {
+        sched_yield();
+    }
+    return 0;
 }
 
 int64_t sys_exit(int status)
@@ -119,8 +185,62 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
     strncpy(kfilename, filename, sizeof(kfilename) - 1);
     kfilename[sizeof(kfilename) - 1] = '\0';
 
+    /* Safely copy argv strings into kernel memory before address space change */
+    char kargs[16][128];
+    char *kargv[17];
+    int argc = 0;
+    if (argv) {
+        while (argv[argc] != NULL && argc < 16) {
+            strncpy(kargs[argc], argv[argc], sizeof(kargs[argc]) - 1);
+            kargs[argc][sizeof(kargs[argc]) - 1] = '\0';
+            kargv[argc] = kargs[argc];
+            argc++;
+        }
+    }
+    kargv[argc] = NULL;
+
+    /* Safely copy envp strings into kernel memory */
+    char kenvs[16][128];
+    char *kenvp[17];
+    int envc = 0;
+    if (envp) {
+        while (envp[envc] != NULL && envc < 16) {
+            strncpy(kenvs[envc], envp[envc], sizeof(kenvs[envc]) - 1);
+            kenvs[envc][sizeof(kenvs[envc]) - 1] = '\0';
+            kenvp[envc] = kenvs[envc];
+            envc++;
+        }
+    }
+    kenvp[envc] = NULL;
+
+    /* Locate binary: check VFS first, then builtin binaries table */
+    void *vfs_elf_buf = NULL;
     size_t binary_size = 0;
-    const void *elf_data = find_builtin_binary(kfilename, &binary_size);
+    const void *elf_data = NULL;
+
+    int vfs_fd = sys_open(kfilename, O_RDONLY, 0);
+    if (vfs_fd >= 0) {
+        struct stat st;
+        if (sys_fstat(vfs_fd, &st) == 0 && st.st_size > 0 && st.st_size < 16 * 1024 * 1024) {
+            vfs_elf_buf = kmalloc(st.st_size, GFP_KERNEL);
+            if (vfs_elf_buf) {
+                ssize_t rd = sys_read(vfs_fd, vfs_elf_buf, st.st_size);
+                if (rd == (ssize_t)st.st_size) {
+                    elf_data = vfs_elf_buf;
+                    binary_size = st.st_size;
+                } else {
+                    kfree(vfs_elf_buf);
+                    vfs_elf_buf = NULL;
+                }
+            }
+        }
+        sys_close(vfs_fd);
+    }
+
+    if (!elf_data) {
+        elf_data = find_builtin_binary(kfilename, &binary_size);
+    }
+
     if (!elf_data) {
         printk("<4>[EXECVE] Binary not found: %s\n", kfilename);
         return -ENOENT;
@@ -129,6 +249,7 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
     /* 1. Create clean user address space */
     uintptr_t new_pml4_phys = pmm_alloc_page();
     if (!new_pml4_phys) {
+        if (vfs_elf_buf) kfree(vfs_elf_buf);
         return -ENOMEM;
     }
     uint64_t *new_pml4 = (uint64_t *)vmm_phys_to_virt(new_pml4_phys);
@@ -148,6 +269,10 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
     uint64_t entry_point = 0;
     uint64_t brk_start = 0;
     int ret = elf64_load_pml4(new_pml4, elf_data, binary_size, &entry_point, &brk_start);
+    if (vfs_elf_buf) {
+        kfree(vfs_elf_buf);
+        vfs_elf_buf = NULL;
+    }
     if (ret < 0) {
         printk("<3>[EXECVE] Failed to load ELF %s: %d\n", filename, ret);
         return ret;
@@ -168,18 +293,10 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
                      PTE_USER | PTE_WRITABLE);
     }
 
-    /* 4. Count argv arguments */
-    int argc = 0;
-    if (argv) {
-        while (argv[argc] != NULL) {
-            argc++;
-        }
-    }
+    /* 4. Construct System V AMD64 ABI user stack */
+    uint64_t user_sp = setup_user_stack(USER_STACK_TOP, argc, (char **)kargv, (char **)kenvp, entry_point);
 
-    /* 5. Construct System V AMD64 ABI user stack */
-    uint64_t user_sp = setup_user_stack(USER_STACK_TOP, argc, (char **)argv, (char **)envp, entry_point);
-
-    /* 6. Free previous user space if custom */
+    /* 5. Free previous user space if custom */
     if (curr->pml4 && curr->pml4 != k_pml4) {
         vmm_destroy_user_space(curr->pml4);
     }

@@ -25,6 +25,12 @@ typedef uint64_t           ino_t;
 typedef uint32_t           mode_t;
 typedef int64_t            off_t;
 typedef uint32_t           dev_t;
+typedef int64_t            time_t;
+
+struct timespec {
+    time_t tv_sec;
+    int64_t tv_nsec;
+};
 
 #ifndef bool
 typedef _Bool              bool;

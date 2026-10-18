@@ -7,6 +7,7 @@
 #include <aurora/arch/x86_64/gdt.h>
 #include <aurora/arch/x86_64/idt.h>
 #include <aurora/arch/x86_64/interrupts.h>
+#include <aurora/arch/x86_64/cr.h>
 #include <aurora/arch/x86_64/pic.h>
 #include <aurora/arch/x86_64/pit.h>
 #include <aurora/arch/x86_64/m1_test.h>
@@ -25,6 +26,7 @@
 #include <aurora/fs/m7_test.h>
 #include <aurora/fs/m8_test.h>
 #include <aurora/drivers/m9_test.h>
+#include <aurora/proc/m10_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -64,6 +66,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     gdt_init();
     idt_init();
     exceptions_init();
+    sse_init();
 
     /* Run Milestone M1 verification */
     test_page_fault_handling();
@@ -110,6 +113,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* --- Milestone M9: TTY line discipline, VT0-5, kbd, termios, Ctrl-C --- */
     test_tty_subsystem();
+
+    /* --- Milestone M10: libc full + crt0 + user utilities (ls, cat, cp, ps, vi, grep) --- */
+    test_m10_libc_and_user_utils();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

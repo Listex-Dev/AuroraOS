@@ -45,18 +45,46 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_lseek((int)a1, (uint64_t)a2, (int)a3);
         case SYS_ioctl:
             return sys_ioctl((int)a1, (unsigned long)a2, (void *)a3);
+        case SYS_pipe:
+            return sys_pipe((int *)a1);
         case SYS_dup:
             return sys_dup((int)a1);
         case SYS_dup2:
             return sys_dup2((int)a1, (int)a2);
+        case SYS_nanosleep:
+            return sys_nanosleep((const struct timespec *)a1, (struct timespec *)a2);
         case SYS_mkdir:
             return sys_mkdir((const char *)a1, (mode_t)a2);
+        case SYS_rmdir:
+            return sys_unlink((const char *)a1);
         case SYS_unlink:
             return sys_unlink((const char *)a1);
         case SYS_exit:
             return sys_exit((int)a1);
         case SYS_getpid:
             return sys_getpid();
+        case SYS_getppid:
+            return sys_getppid();
+        case SYS_getuid:
+            return sys_getuid();
+        case SYS_getgid:
+            return sys_getgid();
+        case SYS_geteuid:
+            return sys_geteuid();
+        case SYS_getegid:
+            return sys_getegid();
+        case SYS_setuid:
+            return sys_setuid((uid_t)a1);
+        case SYS_setgid:
+            return sys_setgid((gid_t)a1);
+        case SYS_uname:
+            return sys_uname((struct utsname *)a1);
+        case SYS_getcwd:
+            return sys_getcwd((char *)a1, (size_t)a2);
+        case SYS_chdir:
+            return sys_chdir((const char *)a1);
+        case SYS_getdents64:
+            return sys_getdents64((int)a1, (void *)a2, (size_t)a3);
         case SYS_brk:
             return sys_brk((uintptr_t)a1);
         case SYS_fork:

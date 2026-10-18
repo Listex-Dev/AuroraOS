@@ -70,7 +70,8 @@ C_SRCS  := kernel/main.c \
            kernel/drivers/console.c \
            kernel/drivers/tty.c \
            kernel/drivers/kbd.c \
-           kernel/drivers/m9_test.c
+           kernel/drivers/m9_test.c \
+           kernel/proc/m10_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -91,6 +92,13 @@ TARGET_ELF := $(BUILD_DIR)/aurora.elf
 TARGET_BIN := $(BUILD_DIR)/aurora.bin
 DISK_IMG   := $(BUILD_DIR)/aurora.img
 HELLO_ELF  := $(BUILD_DIR)/hello.elf
+USER_BINS  := $(BUILD_DIR)/bin/ls \
+              $(BUILD_DIR)/bin/cat \
+              $(BUILD_DIR)/bin/cp \
+              $(BUILD_DIR)/bin/ps \
+              $(BUILD_DIR)/bin/vi \
+              $(BUILD_DIR)/bin/grep \
+              $(BUILD_DIR)/bin/test_m10
 
 .PHONY: all kernel run debug test clean
 
@@ -107,7 +115,10 @@ $(HELLO_ELF): user/hello.S
 	@echo "  CC      $< -> $@"
 	@$(CC) -nostdlib -static -fno-pie -no-pie $< -o $@
 
-$(BUILD_DIR)/kernel/proc/builtin_binaries.o: $(HELLO_ELF)
+$(BUILD_DIR)/libc/libc.a $(USER_BINS):
+	@bash scripts/build_userland.sh
+
+$(BUILD_DIR)/kernel/proc/builtin_binaries.o: $(HELLO_ELF) $(USER_BINS)
 
 $(TARGET_ELF): $(OBJS) boot/linker.ld
 	@mkdir -p $(dir $@)
@@ -160,13 +171,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M9 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M10 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M9 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M10 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M9 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M10 verification failed! <<<"; \
 		exit 1; \
 	fi
 
