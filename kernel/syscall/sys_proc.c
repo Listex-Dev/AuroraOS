@@ -12,6 +12,8 @@
 #include <aurora/string.h>
 #include <aurora/printk.h>
 #include <aurora/arch/x86_64/pit.h>
+#include <aurora/arch/x86_64/interrupts.h>
+#include <aurora/io.h>
 #include <aurora/errno.h>
 
 extern void fork_ret_trampoline(void);
@@ -77,12 +79,13 @@ int64_t sys_nanosleep(const struct timespec *req, struct timespec *rem)
 {
     (void)rem;
     if (!req) return -EFAULT;
-    uint64_t ticks_to_wait = (req->tv_sec * 100) + (req->tv_nsec / 10000000ULL);
+    uint64_t ticks_to_wait = (req->tv_sec * 5) + (req->tv_nsec / 200000000ULL);
     if (ticks_to_wait == 0 && (req->tv_sec > 0 || req->tv_nsec > 0)) {
         ticks_to_wait = 1;
     }
     uint64_t target_ticks = pit_get_ticks() + ticks_to_wait;
-    while (pit_get_ticks() < target_ticks) {
+    for (uint64_t i = 0; i < ticks_to_wait * 50; i++) {
+        if (pit_get_ticks() >= target_ticks) break;
         sched_yield();
     }
     return 0;
@@ -94,6 +97,10 @@ int64_t sys_exit(int status)
     if (curr) {
         printk("<6>[SYSCALL] Process %s (PID %d) exited with status %d\n",
                curr->comm, curr->pid, status);
+        if (curr->files) {
+            files_free((struct files_struct *)curr->files);
+            curr->files = NULL;
+        }
     }
     sched_exit(status);
     return 0;
@@ -357,6 +364,7 @@ int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage)
     while (1) {
         bool has_children = false;
         task_t *zombie = NULL;
+        task_t *stopped = NULL;
 
         for (size_t i = 0; i < sched_num_tasks(); i++) {
             task_t *t = sched_get_task_at(i);
@@ -367,11 +375,22 @@ int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage)
             if (pid > 0 && t->pid != pid) {
                 continue;
             }
+            if (pid == 0 && t->pgid != curr->pgid) {
+                continue;
+            }
+            if (pid < -1 && t->pgid != -pid) {
+                continue;
+            }
 
             has_children = true;
 
             if (t->state == TASK_ZOMBIE) {
                 zombie = t;
+                break;
+            }
+
+            if ((options & WUNTRACED) && t->state == TASK_STOPPED) {
+                stopped = t;
                 break;
             }
         }
@@ -405,6 +424,13 @@ int64_t sys_wait4(pid_t pid, int *status, int options, void *rusage)
             return reaped_pid;
         }
 
+        if (stopped) {
+            if (status) {
+                *status = ((stopped->exit_code >= 128 ? (stopped->exit_code - 128) : 20) << 8) | 0x7F;
+            }
+            return stopped->pid;
+        }
+
         if (options & WNOHANG) {
             return 0;
         }
@@ -433,6 +459,17 @@ int64_t sys_kill(pid_t pid, int sig)
                     if (sig == SIGKILL || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT) {
                         t->exit_code = 128 + sig;
                         t->state = TASK_ZOMBIE;
+                        if (t->files) {
+                            files_free((struct files_struct *)t->files);
+                            t->files = NULL;
+                        }
+                    } else if (sig == SIGSTOP || sig == SIGTSTP) {
+                        t->exit_code = 128 + sig;
+                        t->state = TASK_STOPPED;
+                    } else if (sig == SIGCONT) {
+                        if (t->state == TASK_STOPPED) {
+                            t->state = TASK_RUNNING;
+                        }
                     }
                 }
                 count++;
@@ -463,9 +500,71 @@ int64_t sys_kill(pid_t pid, int sig)
     if (sig == SIGKILL || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT) {
         target->exit_code = 128 + sig;
         target->state = TASK_ZOMBIE;
+        if (target->files) {
+            files_free((struct files_struct *)target->files);
+            target->files = NULL;
+        }
+        return 0;
+    } else if (sig == SIGSTOP || sig == SIGTSTP) {
+        target->exit_code = 128 + sig;
+        target->state = TASK_STOPPED;
+        return 0;
+    } else if (sig == SIGCONT) {
+        if (target->state == TASK_STOPPED) {
+            target->state = TASK_RUNNING;
+        }
         return 0;
     }
 
     return 0;
+}
+
+int64_t sys_setpgid(pid_t pid, pid_t pgid)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+
+    if (pid == 0) pid = curr->pid;
+    if (pgid == 0) pgid = pid;
+    if (pgid < 0) return -EINVAL;
+
+    task_t *target = (pid == curr->pid) ? curr : sched_find_task(pid);
+    if (!target) return -ESRCH;
+
+    target->pgid = pgid;
+    return 0;
+}
+
+int64_t sys_getpgrp(void)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+    return curr->pgid ? curr->pgid : curr->pid;
+}
+
+int64_t sys_getpgid(pid_t pid)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+    if (pid == 0) return curr->pgid ? curr->pgid : curr->pid;
+
+    task_t *target = sched_find_task(pid);
+    if (!target) return -ESRCH;
+    return target->pgid ? target->pgid : target->pid;
+}
+
+int64_t sys_setsid(void)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+
+    if (curr->pgid == curr->pid && curr->sid == curr->pid) {
+        return -EPERM;
+    }
+
+    curr->sid = curr->pid;
+    curr->pgid = curr->pid;
+    curr->tty = NULL;
+    return curr->sid;
 }
 

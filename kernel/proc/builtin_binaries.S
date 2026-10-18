@@ -11,6 +11,12 @@
 .global bin_vi_start, bin_vi_end
 .global bin_grep_start, bin_grep_end
 .global bin_test_m10_start, bin_test_m10_end
+.global bin_sleep_start, bin_sleep_end
+.global bin_sh_start, bin_sh_end
+.global bin_getty_start, bin_getty_end
+.global bin_login_start, bin_login_end
+.global bin_init_start, bin_init_end
+.global bin_test_m11_start, bin_test_m11_end
 
 .align 16
 bin_hello_start:
@@ -51,3 +57,33 @@ bin_grep_end:
 bin_test_m10_start:
     .incbin "build/bin/test_m10"
 bin_test_m10_end:
+
+.align 16
+bin_sleep_start:
+    .incbin "build/bin/sleep"
+bin_sleep_end:
+
+.align 16
+bin_sh_start:
+    .incbin "build/bin/sh"
+bin_sh_end:
+
+.align 16
+bin_getty_start:
+    .incbin "build/bin/getty"
+bin_getty_end:
+
+.align 16
+bin_login_start:
+    .incbin "build/bin/login"
+bin_login_end:
+
+.align 16
+bin_init_start:
+    .incbin "build/bin/init"
+bin_init_end:
+
+.align 16
+bin_test_m11_start:
+    .incbin "build/bin/test_m11"
+bin_test_m11_end:

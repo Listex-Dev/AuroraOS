@@ -35,7 +35,11 @@
 #define SYS_setgid     106
 #define SYS_geteuid    107
 #define SYS_getegid    108
+#define SYS_setpgid    109
 #define SYS_getppid    110
+#define SYS_getpgrp    111
+#define SYS_setsid     112
+#define SYS_getpgid    121
 #define SYS_getdents64 217
 
 static inline long __syscall0(long n)

@@ -9,6 +9,12 @@ extern char bin_ps_start[],       bin_ps_end[];
 extern char bin_vi_start[],       bin_vi_end[];
 extern char bin_grep_start[],     bin_grep_end[];
 extern char bin_test_m10_start[], bin_test_m10_end[];
+extern char bin_sleep_start[],    bin_sleep_end[];
+extern char bin_sh_start[],       bin_sh_end[];
+extern char bin_getty_start[],    bin_getty_end[];
+extern char bin_login_start[],    bin_login_end[];
+extern char bin_init_start[],     bin_init_end[];
+extern char bin_test_m11_start[], bin_test_m11_end[];
 
 struct binary_entry {
     const char *path;
@@ -25,6 +31,13 @@ static const struct binary_entry builtin_table[] = {
     { "/bin/vi",       bin_vi_start,       bin_vi_end },
     { "/bin/grep",     bin_grep_start,     bin_grep_end },
     { "/bin/test_m10", bin_test_m10_start, bin_test_m10_end },
+    { "/bin/sleep",    bin_sleep_start,    bin_sleep_end },
+    { "/bin/sh",       bin_sh_start,       bin_sh_end },
+    { "/bin/getty",    bin_getty_start,    bin_getty_end },
+    { "/bin/login",    bin_login_start,    bin_login_end },
+    { "/bin/init",     bin_init_start,     bin_init_end },
+    { "/sbin/init",    bin_init_start,     bin_init_end },
+    { "/bin/test_m11", bin_test_m11_start, bin_test_m11_end },
     { NULL, NULL, NULL }
 };
 

@@ -1088,7 +1088,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M8** | **`ext2/ext4` R/W**, `mkfs`, `fsck`, монтирование корня, `pivot_root`, `/etc/fstab` | Загрузка с диска, корень — ext4, файлы переживают перезагрузку | `[x]` |
 | **M9** | TTY: line discipline, VT0–5, kbd, `termios`, canonical/raw, `Ctrl-C` | `Ctrl-C` убивает foreground-процесс; `vi` работает в raw | `[x]` |
 | **M10** | libc полная + `crt0` + сборка user-утилит | `ls`, `cat`, `cp`, `ps`, `vi`, `grep` собраны и работают | `[x]` |
-| **M11** | `/bin/sh` с конвейерами, редиректами, job control; `init` (PID 1) + `getty` + `login` | **Полный сценарий: power-on → `aurora login:` → `root` → shell** | `[ ]` |
+| **M11** | `/bin/sh` с конвейерами, редиректами, job control; `init` (PID 1) + `getty` + `login` | **Полный сценарий: power-on → `aurora login:` → `root` → shell** | `[x]` |
 | **M12** | Блочные устройства: `pci`, `ata/ahci`, `/dev/sda*`, `mknod`, `major/minor` | `fdisk -l`, `mount /dev/sda2 /mnt` работают | `[ ]` |
 | **M13** | Сеть: `eth` → `arp` → `ipv4` → `icmp`/`udp`/`tcp`, sockets, `lo`, `e1000`, `virtio-net` | `ping 10.0.2.2` получает ответы; TCP-соединение устанавливается | `[ ]` |
 | **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[ ]` |
@@ -1346,11 +1346,11 @@ reboot: System halted
 [x] M4  syscall gate, write/exit/getpid/brk
 [x] M5  fork, wait4, execve (ELF64), сигналы
 [x] M6  VFS: inode/dentry/file, namei, open/read/write
-[ ] M7  ramfs+initrd, procfs, devtmpfs, tmpfs, sysfs
-[ ] M8  ext2/ext4 R/W, mkfs, fsck, pivot_root, fstab
-[ ] M9  TTY, VT0-5, kbd, termios, Ctrl-C
-[ ] M10 libc + crt0 + сборка утилит
-[ ] M11 /bin/sh + init + getty + login  →  ЛОГИН РАБОТАЕТ
+[x] M7  ramfs+initrd, procfs, devtmpfs, tmpfs, sysfs
+[x] M8  ext2/ext4 R/W, mkfs, fsck, pivot_root, fstab
+[x] M9  TTY, VT0-5, kbd, termios, Ctrl-C
+[x] M10 libc + crt0 + сборка утилит
+[x] M11 /bin/sh + init + getty + login  →  ЛОГИН РАБОТАЕТ
 [ ] M12 pci, ata/ahci, /dev/sda*, mknod, major:minor
 [ ] M13 eth/arp/ipv4/icmp/udp/tcp + sockets + e1000/virtio
 [ ] M14 DHCP, DNS, ifconfig, netstat, wget, pty

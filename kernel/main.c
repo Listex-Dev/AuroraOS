@@ -27,6 +27,7 @@
 #include <aurora/fs/m8_test.h>
 #include <aurora/drivers/m9_test.h>
 #include <aurora/proc/m10_test.h>
+#include <aurora/proc/m11_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -116,6 +117,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* --- Milestone M10: libc full + crt0 + user utilities (ls, cat, cp, ps, vi, grep) --- */
     test_m10_libc_and_user_utils();
+
+    /* --- Milestone M11: /bin/sh (pipelines, redirections, job control), init (PID 1), getty, login --- */
+    test_m11_init_getty_login_shell();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

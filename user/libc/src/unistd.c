@@ -133,6 +133,40 @@ int setgid(gid_t gid)
     return (int)__syscall_ret(__syscall1(SYS_setgid, gid));
 }
 
+int setpgid(pid_t pid, pid_t pgid)
+{
+    return (int)__syscall_ret(__syscall2(SYS_setpgid, pid, pgid));
+}
+
+pid_t getpgrp(void)
+{
+    return (pid_t)__syscall_ret(__syscall0(SYS_getpgrp));
+}
+
+pid_t getpgid(pid_t pid)
+{
+    return (pid_t)__syscall_ret(__syscall1(SYS_getpgid, pid));
+}
+
+pid_t setsid(void)
+{
+    return (pid_t)__syscall_ret(__syscall0(SYS_setsid));
+}
+
+pid_t tcgetpgrp(int fd)
+{
+    pid_t pgrp = 0;
+    if (ioctl(fd, TIOCGPGRP, &pgrp) < 0) {
+        return -1;
+    }
+    return pgrp;
+}
+
+int tcsetpgrp(int fd, pid_t pgrp)
+{
+    return ioctl(fd, TIOCSPGRP, &pgrp);
+}
+
 char *getcwd(char *buf, size_t size)
 {
     long ret = __syscall_ret(__syscall2(SYS_getcwd, (long)buf, size));

@@ -37,6 +37,12 @@ uid_t geteuid(void);
 gid_t getegid(void);
 int setuid(uid_t uid);
 int setgid(gid_t gid);
+int setpgid(pid_t pid, pid_t pgid);
+pid_t getpgrp(void);
+pid_t getpgid(pid_t pid);
+pid_t setsid(void);
+pid_t tcgetpgrp(int fd);
+int tcsetpgrp(int fd, pid_t pgrp);
 
 char *getcwd(char *buf, size_t size);
 int chdir(const char *path);

@@ -132,13 +132,79 @@ char *getenv(const char *name)
 
 int setenv(const char *name, const char *value, int overwrite)
 {
-    (void)name; (void)value; (void)overwrite;
+    if (!name || *name == '\0' || strchr(name, '=') != NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!value) value = "";
+
+    size_t nlen = strlen(name);
+    size_t vlen = strlen(value);
+    char *new_entry = malloc(nlen + 1 + vlen + 1);
+    if (!new_entry) {
+        errno = ENOMEM;
+        return -1;
+    }
+    memcpy(new_entry, name, nlen);
+    new_entry[nlen] = '=';
+    memcpy(new_entry + nlen + 1, value, vlen);
+    new_entry[nlen + 1 + vlen] = '\0';
+
+    if (environ) {
+        for (int i = 0; environ[i] != NULL; i++) {
+            if (strncmp(environ[i], name, nlen) == 0 && environ[i][nlen] == '=') {
+                if (!overwrite) {
+                    free(new_entry);
+                    return 0;
+                }
+                environ[i] = new_entry;
+                return 0;
+            }
+        }
+    }
+
+    int count = 0;
+    if (environ) {
+        while (environ[count]) count++;
+    }
+
+    char **new_env = malloc((count + 2) * sizeof(char *));
+    if (!new_env) {
+        free(new_entry);
+        errno = ENOMEM;
+        return -1;
+    }
+
+    for (int i = 0; i < count; i++) {
+        new_env[i] = environ[i];
+    }
+    new_env[count] = new_entry;
+    new_env[count + 1] = NULL;
+    environ = new_env;
     return 0;
 }
 
 int unsetenv(const char *name)
 {
-    (void)name;
+    if (!name || *name == '\0' || strchr(name, '=') != NULL) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (!environ) return 0;
+
+    size_t nlen = strlen(name);
+    int i = 0;
+    while (environ[i]) {
+        if (strncmp(environ[i], name, nlen) == 0 && environ[i][nlen] == '=') {
+            int j = i;
+            while (environ[j]) {
+                environ[j] = environ[j + 1];
+                j++;
+            }
+        } else {
+            i++;
+        }
+    }
     return 0;
 }
 

@@ -3,6 +3,8 @@
 #include <aurora/printk.h>
 #include <aurora/panic.h>
 #include <aurora/string.h>
+#include <aurora/proc/sched.h>
+#include <aurora/syscall.h>
 
 static const char *exception_messages[32] = {
     "#DE: Divide-by-zero Error",
@@ -108,6 +110,14 @@ void exception_dispatch(interrupt_frame_t *frame)
 
     if (vec == 14) {
         handle_page_fault(frame);
+        if ((frame->cs & 3) == 3) {
+            task_t *curr = sched_current();
+            printk("<4>[PROCESS] Ring 3 task '%s' (PID %lld) terminated by SIGSEGV (CR2=%p, RIP=%p)\n",
+                   curr ? curr->comm : "unknown",
+                   curr ? (long long)curr->pid : -1,
+                   (void *)read_cr2(), (void *)frame->rip);
+            sys_exit(128 + 11);
+        }
         panic("Unhandled Kernel Page Fault at 0x%p", (void *)read_cr2());
     } else if (vec == 8) {
         printk("<0>[EXCEPTION] Double Fault (#DF) on IST1 stack!\n");
@@ -116,6 +126,14 @@ void exception_dispatch(interrupt_frame_t *frame)
     } else if (vec < 32) {
         printk("<0>[EXCEPTION] %s (Vector %d)\n", exception_messages[vec], (int)vec);
         dump_registers(frame);
+        if ((frame->cs & 3) == 3) {
+            task_t *curr = sched_current();
+            printk("<4>[PROCESS] Ring 3 task '%s' (PID %lld) terminated by fatal CPU exception %d (RIP=%p)\n",
+                   curr ? curr->comm : "unknown",
+                   curr ? (long long)curr->pid : -1,
+                   (int)vec, (void *)frame->rip);
+            sys_exit(128 + (int)vec);
+        }
         panic("Kernel CPU Exception: %s", exception_messages[vec]);
     } else {
         printk("<4>[IRQ] Unhandled Interrupt Vector %d\n", (int)vec);

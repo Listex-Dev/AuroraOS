@@ -35,7 +35,11 @@
 #define SYS_setgid     106
 #define SYS_geteuid    107
 #define SYS_getegid    108
+#define SYS_setpgid    109
 #define SYS_getppid    110
+#define SYS_getpgrp    111
+#define SYS_setsid     112
+#define SYS_getpgid    121
 #define SYS_pivot_root 155
 #define SYS_mount      165
 #define SYS_umount2    166
@@ -84,5 +88,9 @@ int64_t sys_getcwd(char *buf, size_t size);
 int64_t sys_uname(struct utsname *buf);
 int64_t sys_nanosleep(const struct timespec *req, struct timespec *rem);
 int64_t sys_pipe(int pipefd[2]);
+int64_t sys_setpgid(pid_t pid, pid_t pgid);
+int64_t sys_getpgrp(void);
+int64_t sys_setsid(void);
+int64_t sys_getpgid(pid_t pid);
 
 #endif /* _AURORA_SYSCALL_H */

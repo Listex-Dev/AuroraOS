@@ -32,8 +32,11 @@ cpu_switch_to:
     /* 4. Update TSS rsp0 for interrupt stack safety */
     pushq %rsi                  /* Preserve next pointer */
     movq 8(%rsi), %rdi          /* next->kstack */
+    testq %rdi, %rdi
+    jz 1f
     addq $16384, %rdi           /* Top of kernel stack (16 KiB) */
     call tss_set_rsp0
+1:
     popq %rsi                   /* Restore next pointer */
 
     /* 5. Restore callee-saved registers from new stack */

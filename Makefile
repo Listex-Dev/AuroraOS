@@ -71,7 +71,8 @@ C_SRCS  := kernel/main.c \
            kernel/drivers/tty.c \
            kernel/drivers/kbd.c \
            kernel/drivers/m9_test.c \
-           kernel/proc/m10_test.c
+           kernel/proc/m10_test.c \
+           kernel/proc/m11_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -98,7 +99,12 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/ps \
               $(BUILD_DIR)/bin/vi \
               $(BUILD_DIR)/bin/grep \
-              $(BUILD_DIR)/bin/test_m10
+              $(BUILD_DIR)/bin/test_m10 \
+              $(BUILD_DIR)/bin/sh \
+              $(BUILD_DIR)/bin/getty \
+              $(BUILD_DIR)/bin/login \
+              $(BUILD_DIR)/bin/init \
+              $(BUILD_DIR)/bin/test_m11
 
 .PHONY: all kernel run debug test clean
 
@@ -141,14 +147,15 @@ $(BUILD_DIR)/%.o: %.S
 	@$(AS) $(ASFLAGS) $< -o $@
 
 run: $(TARGET_BIN) $(DISK_IMG)
-	@echo "Starting AuroraOS in QEMU (press Ctrl-A then X to exit)..."
+	@echo "Starting AuroraOS in QEMU..."
 	qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
-		-serial stdio \
-		-display none \
-		-no-reboot -no-shutdown
+		-serial mon:stdio \
+		-vga std \
+		-no-reboot -no-shutdown 
+
 
 debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 	@echo "Starting AuroraOS in debug mode (GDB port :1234)..."
@@ -171,13 +178,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M10 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M11 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M10 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M11 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M10 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M11 verification failed! <<<"; \
 		exit 1; \
 	fi
 

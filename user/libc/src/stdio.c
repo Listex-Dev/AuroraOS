@@ -154,6 +154,8 @@ char *fgets(char *s, int size, FILE *stream)
 
 int fputs(const char *s, FILE *stream)
 {
+    if (!stream) return EOF;
+    if (!s) s = "(null)";
     size_t len = strlen(s);
     return (fwrite(s, 1, len, stream) == len) ? 0 : EOF;
 }
@@ -170,9 +172,12 @@ int putchar(int c)
 
 int puts(const char *s)
 {
-    fputs(s, stdout);
-    putchar('\n');
-    return 0;
+    if (!s) s = "(null)";
+    int ret = fputs(s, stdout);
+    if (ret >= 0) {
+        putchar('\n');
+    }
+    return ret;
 }
 
 int ungetc(int c, FILE *stream)

@@ -41,7 +41,10 @@ typedef void (*sighandler_t)(int);
 #define WIFSIGNALED(status) (((signed char)(((status) & 0x7F) + 1) >> 1) > 0)
 #define WTERMSIG(status)    ((status) & 0x7F)
 
-#define WNOHANG 1
+#define WNOHANG    1
+#define WUNTRACED  2
+#define WIFSTOPPED(status) (((status) & 0xFF) == 0x7F)
+#define WSTOPSIG(status)   WEXITSTATUS(status)
 
 int send_signal(pid_t pid, int sig);
 

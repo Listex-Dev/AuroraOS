@@ -372,13 +372,15 @@ int64_t sys_getcwd(char *buf, size_t size)
     path[0] = '\0';
 
     struct dentry *d = pwd;
-    if (d == vfs_get_root() || d->d_parent == d) {
-        strncpy(buf, "/", size - 1);
-        buf[size - 1] = '\0';
-        return (int64_t)strlen(buf);
-    }
 
-    while (d && d != vfs_get_root() && d->d_parent != d) {
+    while (d && d != vfs_get_root()) {
+        struct dentry *mp = vfs_get_mountpoint_for_root(d);
+        if (mp) {
+            d = mp;
+        }
+        if (d == vfs_get_root() || d->d_parent == d) {
+            break;
+        }
         snprintf(temp, sizeof(temp), "/%s%s", d->d_name, path);
         strncpy(path, temp, sizeof(path) - 1);
         path[sizeof(path) - 1] = '\0';
@@ -437,9 +439,9 @@ static ssize_t pipe_read(struct file *file, void *buf, size_t count, uint64_t *p
     (void)pos;
     if (!file->f_inode || !file->f_inode->i_private) return -EINVAL;
     struct pipe_buf *pipe = (struct pipe_buf *)file->f_inode->i_private;
-    if (pipe->count == 0) {
-        if (pipe->writers == 0) return 0; /* EOF */
-        return 0;
+    while (pipe->count == 0) {
+        if (pipe->writers <= 0) return 0; /* EOF: all writers closed */
+        sched_yield();
     }
     size_t to_read = count < pipe->count ? count : pipe->count;
     char *out = (char *)buf;
@@ -456,10 +458,15 @@ static ssize_t pipe_write(struct file *file, const void *buf, size_t count, uint
     (void)pos;
     if (!file->f_inode || !file->f_inode->i_private) return -EINVAL;
     struct pipe_buf *pipe = (struct pipe_buf *)file->f_inode->i_private;
-    if (pipe->readers == 0) return -EPIPE;
+    if (pipe->readers <= 0) return -EPIPE;
     const char *in = (const char *)buf;
     size_t written = 0;
-    while (written < count && pipe->count < sizeof(pipe->data)) {
+    while (written < count) {
+        if (pipe->readers <= 0) return -EPIPE;
+        if (pipe->count >= sizeof(pipe->data)) {
+            sched_yield();
+            continue;
+        }
         pipe->data[pipe->tail] = in[written++];
         pipe->tail = (pipe->tail + 1) % sizeof(pipe->data);
         pipe->count++;
@@ -471,8 +478,8 @@ static int pipe_release(struct inode *inode, struct file *file)
 {
     if (inode && inode->i_private) {
         struct pipe_buf *pipe = (struct pipe_buf *)inode->i_private;
-        if (file->f_flags == O_RDONLY) pipe->readers--;
-        else if (file->f_flags == O_WRONLY) pipe->writers--;
+        if ((file->f_flags & O_ACCMODE) == O_RDONLY) pipe->readers--;
+        else if ((file->f_flags & O_ACCMODE) == O_WRONLY) pipe->writers--;
         if (pipe->readers <= 0 && pipe->writers <= 0) {
             kfree(pipe);
             inode->i_private = NULL;

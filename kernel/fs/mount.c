@@ -84,6 +84,17 @@ int vfs_mount(const char *source, const char *target, const char *fstype, uint32
     return 0;
 }
 
+struct dentry *vfs_get_mountpoint_for_root(struct dentry *d)
+{
+    if (!d) return NULL;
+    for (struct vfsmount *m = mount_list_head; m != NULL; m = m->mnt_next) {
+        if (m->mnt_root == d) {
+            return m->mnt_mountpoint;
+        }
+    }
+    return NULL;
+}
+
 int vfs_pivot_root(const char *new_root_path, const char *put_old_path)
 {
     if (!new_root_path || !put_old_path) {

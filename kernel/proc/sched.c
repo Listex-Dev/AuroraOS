@@ -2,8 +2,11 @@
 #include <aurora/printk.h>
 #include <aurora/io.h>
 #include <aurora/string.h>
+#include <aurora/panic.h>
 #include <aurora/arch/x86_64/cr.h>
+#include <aurora/arch/x86_64/tss.h>
 #include <aurora/mm/vmm.h>
+#include <aurora/mm/heap.h>
 
 #define MAX_TASKS 64
 
@@ -36,10 +39,15 @@ task_t *sched_get_task_at(size_t index)
 void sched_init(void)
 {
     memset(&kernel_idle_task, 0, sizeof(kernel_idle_task));
+    kernel_idle_task.kstack = kmalloc(KERNEL_STACK_SIZE, GFP_KERNEL);
     kernel_idle_task.pid = 0;
     kernel_idle_task.state = TASK_RUNNING;
     kernel_idle_task.time_slice = DEFAULT_TIME_SLICE;
     strncpy(kernel_idle_task.comm, "swapper/0", sizeof(kernel_idle_task.comm) - 1);
+
+    if (kernel_idle_task.kstack) {
+        tss_set_rsp0((uint64_t)kernel_idle_task.kstack + KERNEL_STACK_SIZE);
+    }
 
     g_current_task = &kernel_idle_task;
     runqueue[0] = &kernel_idle_task;
@@ -157,6 +165,17 @@ void sched_exit(int status)
     if (g_current_task) {
         g_current_task->exit_code = status;
         g_current_task->state = TASK_ZOMBIE;
+
+        if (g_current_task->pid == 1) {
+            panic("Attempted to kill init!");
+        }
+
+        /* Re-parent children of the exiting task to init (PID 1) */
+        for (size_t i = 0; i < num_tasks; i++) {
+            if (runqueue[i] && runqueue[i]->ppid == g_current_task->pid) {
+                runqueue[i]->ppid = 1;
+            }
+        }
     }
 
     sched_yield();

@@ -77,6 +77,14 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_setuid((uid_t)a1);
         case SYS_setgid:
             return sys_setgid((gid_t)a1);
+        case SYS_setpgid:
+            return sys_setpgid((pid_t)a1, (pid_t)a2);
+        case SYS_getpgrp:
+            return sys_getpgrp();
+        case SYS_setsid:
+            return sys_setsid();
+        case SYS_getpgid:
+            return sys_getpgid((pid_t)a1);
         case SYS_uname:
             return sys_uname((struct utsname *)a1);
         case SYS_getcwd:
