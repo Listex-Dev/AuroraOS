@@ -1,4 +1,5 @@
 #include <aurora/fs/devtmpfs.h>
+#include <aurora/drivers/block.h>
 #include <aurora/mm/heap.h>
 #include <aurora/serial.h>
 #include <aurora/string.h>
@@ -213,5 +214,27 @@ struct super_block *devtmpfs_create(void)
     devtmpfs_register_chrdev(4, 0, "tty0", &console_fops, 0620);
     devtmpfs_register_chrdev(4, 64, "ttyS0", &console_fops, 0660);
 
+    /* Also populate all registered block devices */
+    for (struct block_device *b = bdev_get_list(); b != NULL; b = b->next) {
+        uint32_t major = (uint32_t)(b->dev_id >> 8);
+        uint32_t minor = (uint32_t)(b->dev_id & 0xFF);
+        devtmpfs_register_blkdev(major, minor, b->name, &g_bdev_fops, 0660);
+    }
+
     return sb;
+}
+
+struct file_operations *chrdev_lookup(dev_t dev)
+{
+    uint32_t major = (uint32_t)(dev >> 8);
+    uint32_t minor = (uint32_t)(dev & 0xFF);
+
+    if (major == 1) {
+        if (minor == 3) return &null_fops;
+        if (minor == 5) return &zero_fops;
+        if (minor == 8 || minor == 9) return &urandom_fops;
+    } else if (major == 4 || major == 5) {
+        return &console_fops;
+    }
+    return NULL;
 }

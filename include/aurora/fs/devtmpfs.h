@@ -11,4 +11,6 @@ int devtmpfs_register_chrdev(uint32_t major, uint32_t minor, const char *name,
 int devtmpfs_register_blkdev(uint32_t major, uint32_t minor, const char *name,
                             struct file_operations *fops, mode_t mode);
 
+struct file_operations *chrdev_lookup(dev_t dev);
+
 #endif /* _AURORA_FS_DEVTMPFS_H */

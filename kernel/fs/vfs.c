@@ -1,6 +1,9 @@
 #include <aurora/fs/vfs.h>
 #include <aurora/fs/ramfs.h>
 #include <aurora/fs/mount.h>
+#include <aurora/fs/devtmpfs.h>
+#include <aurora/drivers/block.h>
+#include <aurora/proc/sched.h>
 #include <aurora/mm/heap.h>
 #include <aurora/serial.h>
 #include <aurora/string.h>
@@ -137,6 +140,13 @@ int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
     file->f_flags = flags;
     file->f_mode = mode;
     file->f_op = inode->i_fop;
+    if (!file->f_op) {
+        if (S_ISBLK(inode->i_mode)) {
+            file->f_op = &g_bdev_fops;
+        } else if (S_ISCHR(inode->i_mode)) {
+            file->f_op = chrdev_lookup(inode->i_rdev);
+        }
+    }
     file->f_count = 1;
     file->f_pos = (flags & O_APPEND) ? inode->i_size : 0;
 
@@ -238,6 +248,7 @@ int vfs_stat(const char *path, struct stat *statbuf)
     statbuf->st_nlink = inode->i_nlink;
     statbuf->st_uid = inode->i_uid;
     statbuf->st_gid = inode->i_gid;
+    statbuf->st_rdev = inode->i_rdev;
     statbuf->st_size = inode->i_size;
     statbuf->st_blksize = 4096;
     statbuf->st_atime = inode->i_atime;
@@ -258,6 +269,7 @@ int vfs_fstat(struct file *file, struct stat *statbuf)
         /* Virtual character device / console stream */
         memset(statbuf, 0, sizeof(struct stat));
         statbuf->st_mode = S_IFCHR | 0666;
+        statbuf->st_rdev = (5 << 8) | 1; /* console */
         statbuf->st_blksize = 1024;
         return 0;
     }
@@ -268,6 +280,7 @@ int vfs_fstat(struct file *file, struct stat *statbuf)
     statbuf->st_nlink = inode->i_nlink;
     statbuf->st_uid = inode->i_uid;
     statbuf->st_gid = inode->i_gid;
+    statbuf->st_rdev = inode->i_rdev;
     statbuf->st_size = inode->i_size;
     statbuf->st_blksize = 4096;
     statbuf->st_atime = inode->i_atime;
@@ -333,4 +346,62 @@ int vfs_unlink(const char *path)
     }
 
     return parent->d_inode->i_op->unlink(parent->d_inode, target);
+}
+
+int vfs_mknod(const char *path, mode_t mode, dev_t dev)
+{
+    if (!path) {
+        return -EFAULT;
+    }
+
+    if (vfs_namei(path) != NULL) {
+        return -EEXIST;
+    }
+
+    char last_comp[128];
+    struct dentry *parent = vfs_namei_parent(path, last_comp);
+    if (!parent || !parent->d_inode) {
+        return -ENOENT;
+    }
+
+    if (!S_ISDIR(parent->d_inode->i_mode)) {
+        return -ENOTDIR;
+    }
+
+    if (parent->d_inode->i_op && parent->d_inode->i_op->mknod) {
+        struct dentry *child = dentry_create(last_comp, parent, NULL);
+        if (!child) return -ENOMEM;
+        int err = parent->d_inode->i_op->mknod(parent->d_inode, child, mode, dev);
+        if (err < 0) {
+            dentry_free(child);
+            return err;
+        }
+        return 0;
+    }
+
+    /* Fallback generic in-memory / devtmpfs inode creation */
+    struct inode *inode = inode_alloc(parent->d_inode->i_sb);
+    if (!inode) {
+        return -ENOMEM;
+    }
+
+    inode->i_mode = mode;
+    inode->i_rdev = dev;
+    task_t *curr = sched_current();
+    inode->i_uid = curr ? curr->euid : 0;
+    inode->i_gid = curr ? curr->egid : 0;
+
+    if (S_ISCHR(mode)) {
+        inode->i_fop = chrdev_lookup(dev);
+    } else if (S_ISBLK(mode)) {
+        inode->i_fop = &g_bdev_fops;
+    }
+
+    struct dentry *child = dentry_create(last_comp, parent, inode);
+    if (!child) {
+        inode_free(inode);
+        return -ENOMEM;
+    }
+
+    return 0;
 }

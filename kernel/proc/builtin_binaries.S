@@ -17,6 +17,10 @@
 .global bin_login_start, bin_login_end
 .global bin_init_start, bin_init_end
 .global bin_test_m11_start, bin_test_m11_end
+.global bin_mknod_start, bin_mknod_end
+.global bin_fdisk_start, bin_fdisk_end
+.global bin_mount_start, bin_mount_end
+.global bin_test_m12_start, bin_test_m12_end
 
 .align 16
 bin_hello_start:
@@ -87,3 +91,23 @@ bin_init_end:
 bin_test_m11_start:
     .incbin "build/bin/test_m11"
 bin_test_m11_end:
+
+.align 16
+bin_mknod_start:
+    .incbin "build/bin/mknod"
+bin_mknod_end:
+
+.align 16
+bin_fdisk_start:
+    .incbin "build/bin/fdisk"
+bin_fdisk_end:
+
+.align 16
+bin_mount_start:
+    .incbin "build/bin/mount"
+bin_mount_end:
+
+.align 16
+bin_test_m12_start:
+    .incbin "build/bin/test_m12"
+bin_test_m12_end:

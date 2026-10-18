@@ -61,6 +61,7 @@ C_SRCS  := kernel/main.c \
            kernel/fs/m6_test.c \
            kernel/fs/m7_test.c \
            kernel/drivers/block.c \
+           kernel/drivers/ahci.c \
            kernel/drivers/ata.c \
            kernel/drivers/ramdisk.c \
            kernel/fs/ext2.c \
@@ -70,9 +71,11 @@ C_SRCS  := kernel/main.c \
            kernel/drivers/console.c \
            kernel/drivers/tty.c \
            kernel/drivers/kbd.c \
+           kernel/drivers/pci.c \
            kernel/drivers/m9_test.c \
            kernel/proc/m10_test.c \
-           kernel/proc/m11_test.c
+           kernel/proc/m11_test.c \
+           kernel/drivers/m12_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -104,7 +107,11 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/getty \
               $(BUILD_DIR)/bin/login \
               $(BUILD_DIR)/bin/init \
-              $(BUILD_DIR)/bin/test_m11
+              $(BUILD_DIR)/bin/test_m11 \
+              $(BUILD_DIR)/bin/mknod \
+              $(BUILD_DIR)/bin/fdisk \
+              $(BUILD_DIR)/bin/mount \
+              $(BUILD_DIR)/bin/test_m12
 
 .PHONY: all kernel run debug test clean
 
@@ -115,6 +122,8 @@ kernel: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 $(DISK_IMG):
 	@mkdir -p $(dir $@)
 	@dd if=/dev/zero of=$@ bs=1M count=64 status=none
+	@echo -e 'label: dos\n,32768,83\n,,83\n' | sfdisk -q $@ >/dev/null 2>&1 || true
+	@mke2fs -q -F -E offset=$$((34816 * 512)) -b 1024 -O ^has_journal $@ 48128 >/dev/null 2>&1 || true
 
 $(HELLO_ELF): user/hello.S
 	@mkdir -p $(dir $@)
@@ -170,7 +179,7 @@ debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 
 test: $(TARGET_BIN) $(DISK_IMG)
 	@echo "Running Milestone automated acceptance test..."
-	@output=$$(timeout 10s qemu-system-x86_64 \
+	@output=$$(timeout 12s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
@@ -178,13 +187,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M11 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M12 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M11 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M12 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M11 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M12 verification failed! <<<"; \
 		exit 1; \
 	fi
 

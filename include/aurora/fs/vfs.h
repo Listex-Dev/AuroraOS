@@ -28,6 +28,7 @@ struct inode_operations {
     struct dentry *(*lookup)(struct inode *dir, struct dentry *dentry);
     int (*create)(struct inode *dir, struct dentry *dentry, mode_t mode);
     int (*mkdir)(struct inode *dir, struct dentry *dentry, mode_t mode);
+    int (*mknod)(struct inode *dir, struct dentry *dentry, mode_t mode, dev_t dev);
     int (*unlink)(struct inode *dir, struct dentry *dentry);
     int (*rmdir)(struct inode *dir, struct dentry *dentry);
 };
@@ -151,6 +152,7 @@ uint64_t vfs_lseek(struct file *file, uint64_t offset, int whence);
 int vfs_stat(const char *path, struct stat *statbuf);
 int vfs_fstat(struct file *file, struct stat *statbuf);
 int vfs_mkdir(const char *path, mode_t mode);
+int vfs_mknod(const char *path, mode_t mode, dev_t dev);
 int vfs_unlink(const char *path);
 int vfs_mount(const char *source, const char *target, const char *fstype, uint32_t flags, const void *data);
 

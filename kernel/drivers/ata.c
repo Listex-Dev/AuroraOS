@@ -223,7 +223,33 @@ static struct block_device_ops g_part_bdev_ops = {
     .flush = part_bdev_flush,
 };
 
-static void ata_scan_partitions(struct block_device *disk_bdev)
+struct gpt_header {
+    uint64_t signature; /* "EFI PART" = 0x5452415020494645ULL */
+    uint32_t revision;
+    uint32_t header_size;
+    uint32_t header_crc32;
+    uint32_t reserved;
+    uint64_t my_lba;
+    uint64_t alternate_lba;
+    uint64_t first_usable_lba;
+    uint64_t last_usable_lba;
+    uint8_t  disk_guid[16];
+    uint64_t partition_entry_lba;
+    uint32_t num_partition_entries;
+    uint32_t sizeof_partition_entry;
+    uint32_t partition_entry_array_crc32;
+} __attribute__((packed));
+
+struct gpt_partition_entry {
+    uint8_t  type_guid[16];
+    uint8_t  unique_guid[16];
+    uint64_t starting_lba;
+    uint64_t ending_lba;
+    uint64_t attributes;
+    uint16_t name[36];
+} __attribute__((packed));
+
+void ata_scan_partitions(struct block_device *disk_bdev)
 {
     uint8_t sector[512];
     if (bdev_read(disk_bdev, 0, 1, sector) != 0) {
@@ -235,6 +261,74 @@ static void ata_scan_partitions(struct block_device *disk_bdev)
     }
 
     struct mbr_partition *parts = (struct mbr_partition *)(sector + 446);
+    bool has_gpt = false;
+    for (int i = 0; i < 4; i++) {
+        if (parts[i].type == 0xEE) {
+            has_gpt = true;
+            break;
+        }
+    }
+
+    if (has_gpt) {
+        uint8_t gpt_buf[512];
+        if (bdev_read(disk_bdev, 1, 1, gpt_buf) == 0) {
+            struct gpt_header *gh = (struct gpt_header *)gpt_buf;
+            if (gh->signature == 0x5452415020494645ULL) {
+                uint32_t num_entries = gh->num_partition_entries;
+                if (num_entries > 128) num_entries = 128;
+                uint64_t entry_lba = gh->partition_entry_lba;
+                uint8_t entry_buf[512];
+                int part_idx = 0;
+
+                for (uint32_t e = 0; e < num_entries; e++) {
+                    uint64_t lba_offset = entry_lba + (e * sizeof(struct gpt_partition_entry)) / 512;
+                    uint32_t in_sector_offset = (e * sizeof(struct gpt_partition_entry)) % 512;
+                    if (in_sector_offset == 0) {
+                        if (bdev_read(disk_bdev, lba_offset, 1, entry_buf) != 0) {
+                            break;
+                        }
+                    }
+                    struct gpt_partition_entry *ge = (struct gpt_partition_entry *)(entry_buf + in_sector_offset);
+                    bool non_zero = false;
+                    for (int g = 0; g < 16; g++) {
+                        if (ge->type_guid[g] != 0) {
+                            non_zero = true;
+                            break;
+                        }
+                    }
+                    if (!non_zero || ge->ending_lba < ge->starting_lba) {
+                        continue;
+                    }
+
+                    part_idx++;
+                    struct partition_info *pi = (struct partition_info *)kzalloc(sizeof(struct partition_info), GFP_KERNEL);
+                    if (!pi) continue;
+                    pi->parent = disk_bdev;
+                    pi->lba_start = ge->starting_lba;
+                    pi->num_sectors = ge->ending_lba - ge->starting_lba + 1;
+
+                    struct block_device *part_bdev = (struct block_device *)kzalloc(sizeof(struct block_device), GFP_KERNEL);
+                    if (!part_bdev) {
+                        kfree(pi);
+                        continue;
+                    }
+                    snprintf(part_bdev->name, sizeof(part_bdev->name), "%s%d", disk_bdev->name, part_idx);
+                    part_bdev->dev_id = (disk_bdev->dev_id & 0xFF00) | part_idx;
+                    part_bdev->block_size = 512;
+                    part_bdev->total_blocks = pi->num_sectors;
+                    part_bdev->ops = &g_part_bdev_ops;
+                    part_bdev->private_data = pi;
+
+                    bdev_register(part_bdev);
+                    printk("<6>[GPT] Registered partition /dev/%s (LBA %llu..%llu, %llu sectors)\n",
+                           part_bdev->name, ge->starting_lba, ge->ending_lba, pi->num_sectors);
+                }
+                return;
+            }
+        }
+    }
+
+    /* Standard MBR partitions */
     for (int i = 0; i < 4; i++) {
         if (parts[i].type == 0 || parts[i].num_sectors == 0) {
             continue;
@@ -261,11 +355,17 @@ static void ata_scan_partitions(struct block_device *disk_bdev)
         part_bdev->private_data = pi;
 
         bdev_register(part_bdev);
+        printk("<6>[MBR] Registered partition /dev/%s (type 0x%02x, start LBA %u, %u sectors)\n",
+               part_bdev->name, parts[i].type, parts[i].lba_start, parts[i].num_sectors);
     }
 }
 
 int ata_init(void)
 {
+    if (bdev_get("sda")) {
+        return 0;
+    }
+
     /* Select master drive */
     outb(ATA_REG_DRIVE_HEAD, 0xA0);
     ata_io_delay();

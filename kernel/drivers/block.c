@@ -116,7 +116,7 @@ static uint64_t bdev_file_llseek(struct file *file, uint64_t offset, int whence)
     return file->f_pos;
 }
 
-static struct file_operations g_bdev_fops = {
+struct file_operations g_bdev_fops = {
     .read = bdev_file_read,
     .write = bdev_file_write,
     .llseek = bdev_file_llseek,
@@ -163,6 +163,11 @@ int bdev_unregister(struct block_device *bdev)
         curr = &(*curr)->next;
     }
     return -ENOENT;
+}
+
+struct block_device *bdev_get_list(void)
+{
+    return g_bdev_list;
 }
 
 struct block_device *bdev_get(const char *name)

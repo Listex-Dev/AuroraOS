@@ -28,6 +28,7 @@
 #include <aurora/drivers/m9_test.h>
 #include <aurora/proc/m10_test.h>
 #include <aurora/proc/m11_test.h>
+#include <aurora/drivers/m12_test.h>
 
 void kmain(uint64_t magic, uint64_t mbi_addr)
 {
@@ -120,6 +121,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
 
     /* --- Milestone M11: /bin/sh (pipelines, redirections, job control), init (PID 1), getty, login --- */
     test_m11_init_getty_login_shell();
+
+    /* --- Milestone M12: PCI bus, ATA/AHCI block devices, partitions, mknod, major:minor --- */
+    test_m12_block_and_pci_subsystem();
 
     /* Halt CPU awaiting interrupts */
     while (1) {

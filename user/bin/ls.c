@@ -30,7 +30,11 @@ static void list_dir(const char *path, int opt_l, int opt_a)
             if (opt_l) {
                 char modestr[12];
                 format_mode(st.st_mode, modestr);
-                printf("%s %8lld %s\n", modestr, (long long)st.st_size, path);
+                if (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) {
+                    printf("%s %3u, %3u %s\n", modestr, major(st.st_rdev), minor(st.st_rdev), path);
+                } else {
+                    printf("%s %8lld %s\n", modestr, (long long)st.st_size, path);
+                }
             } else {
                 printf("%s\n", path);
             }
@@ -58,7 +62,11 @@ static void list_dir(const char *path, int opt_l, int opt_a)
             if (stat(fullpath, &st) == 0) {
                 char modestr[12];
                 format_mode(st.st_mode, modestr);
-                printf("%s %8lld %s\n", modestr, (long long)st.st_size, ent->d_name);
+                if (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) {
+                    printf("%s %3u, %3u %s\n", modestr, major(st.st_rdev), minor(st.st_rdev), ent->d_name);
+                } else {
+                    printf("%s %8lld %s\n", modestr, (long long)st.st_size, ent->d_name);
+                }
             } else {
                 printf("%-10s %8s %s\n", (ent->d_type == DT_DIR) ? "drwxr-xr-x" : "-rw-r--r--", "0", ent->d_name);
             }

@@ -195,6 +195,11 @@ int64_t sys_mkdir(const char *pathname, mode_t mode)
     return vfs_mkdir(pathname, mode);
 }
 
+int64_t sys_mknod(const char *pathname, mode_t mode, dev_t dev)
+{
+    return vfs_mknod(pathname, mode, dev);
+}
+
 int64_t sys_unlink(const char *pathname)
 {
     return vfs_unlink(pathname);

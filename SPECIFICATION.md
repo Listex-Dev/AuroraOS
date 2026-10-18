@@ -1089,7 +1089,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M9** | TTY: line discipline, VT0–5, kbd, `termios`, canonical/raw, `Ctrl-C` | `Ctrl-C` убивает foreground-процесс; `vi` работает в raw | `[x]` |
 | **M10** | libc полная + `crt0` + сборка user-утилит | `ls`, `cat`, `cp`, `ps`, `vi`, `grep` собраны и работают | `[x]` |
 | **M11** | `/bin/sh` с конвейерами, редиректами, job control; `init` (PID 1) + `getty` + `login` | **Полный сценарий: power-on → `aurora login:` → `root` → shell** | `[x]` |
-| **M12** | Блочные устройства: `pci`, `ata/ahci`, `/dev/sda*`, `mknod`, `major/minor` | `fdisk -l`, `mount /dev/sda2 /mnt` работают | `[ ]` |
+| **M12** | Блочные устройства: `pci`, `ata/ahci`, `/dev/sda*`, `mknod`, `major/minor` | `fdisk -l`, `mount /dev/sda2 /mnt` работают | `[x]` |
 | **M13** | Сеть: `eth` → `arp` → `ipv4` → `icmp`/`udp`/`tcp`, sockets, `lo`, `e1000`, `virtio-net` | `ping 10.0.2.2` получает ответы; TCP-соединение устанавливается | `[ ]` |
 | **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[ ]` |
 | **M15** | Безопасность: `passwd/shadow/group`, `su`, `login`, `umask`, `setuid`, NX, stack canaries | Вход по паролю; `su aurora` меняет UID; canary ловит переполнение | `[ ]` |
@@ -1351,7 +1351,7 @@ reboot: System halted
 [x] M9  TTY, VT0-5, kbd, termios, Ctrl-C
 [x] M10 libc + crt0 + сборка утилит
 [x] M11 /bin/sh + init + getty + login  →  ЛОГИН РАБОТАЕТ
-[ ] M12 pci, ata/ahci, /dev/sda*, mknod, major:minor
+[x] M12 pci, ata/ahci, /dev/sda*, mknod, major:minor
 [ ] M13 eth/arp/ipv4/icmp/udp/tcp + sockets + e1000/virtio
 [ ] M14 DHCP, DNS, ifconfig, netstat, wget, pty
 [ ] M15 passwd/shadow/group, su, login, umask, setuid, NX, canaries

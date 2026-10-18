@@ -40,6 +40,7 @@
 #define SYS_getpgrp    111
 #define SYS_setsid     112
 #define SYS_getpgid    121
+#define SYS_mknod      133
 #define SYS_pivot_root 155
 #define SYS_mount      165
 #define SYS_umount2    166
@@ -64,6 +65,7 @@ int64_t sys_dup2(int oldfd, int newfd);
 int64_t sys_stat(const char *filename, struct stat *statbuf);
 int64_t sys_fstat(int fd, struct stat *statbuf);
 int64_t sys_mkdir(const char *pathname, mode_t mode);
+int64_t sys_mknod(const char *pathname, mode_t mode, dev_t dev);
 int64_t sys_unlink(const char *pathname);
 int64_t sys_exit(int status);
 int64_t sys_getpid(void);

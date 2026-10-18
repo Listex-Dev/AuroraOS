@@ -255,6 +255,17 @@ int mkdir(const char *pathname, mode_t mode)
     return (int)__syscall_ret(__syscall2(SYS_mkdir, (long)pathname, mode));
 }
 
+int mknod(const char *pathname, mode_t mode, dev_t dev)
+{
+    return (int)__syscall_ret(__syscall3(SYS_mknod, (long)pathname, mode, dev));
+}
+
+int mount(const char *source, const char *target, const char *filesystemtype,
+          unsigned long mountflags, const void *data)
+{
+    return (int)__syscall_ret(__syscall5(SYS_mount, (long)source, (long)target, (long)filesystemtype, mountflags, (long)data));
+}
+
 int chmod(const char *pathname, mode_t mode)
 {
     (void)pathname; (void)mode;

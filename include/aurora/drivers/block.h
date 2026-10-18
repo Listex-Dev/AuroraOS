@@ -25,10 +25,13 @@ struct block_device {
 void block_subsys_init(void);
 int bdev_register(struct block_device *bdev);
 int bdev_unregister(struct block_device *bdev);
+struct block_device *bdev_get_list(void);
 struct block_device *bdev_get(const char *name);
 struct block_device *bdev_get_by_dev(dev_t dev_id);
 int bdev_read(struct block_device *bdev, uint64_t lba, uint32_t count, void *buffer);
 int bdev_write(struct block_device *bdev, uint64_t lba, uint32_t count, const void *buffer);
 int bdev_flush(struct block_device *bdev);
+
+extern struct file_operations g_bdev_fops;
 
 #endif /* _AURORA_DRIVERS_BLOCK_H */

@@ -59,7 +59,12 @@ int stat(const char *pathname, struct stat *statbuf);
 int fstat(int fd, struct stat *statbuf);
 int lstat(const char *pathname, struct stat *statbuf);
 int mkdir(const char *pathname, mode_t mode);
+int mknod(const char *pathname, mode_t mode, dev_t dev);
 int chmod(const char *pathname, mode_t mode);
 mode_t umask(mode_t mask);
+
+#define major(dev) ((unsigned int)(((dev) >> 8) & 0xff))
+#define minor(dev) ((unsigned int)((dev) & 0xff))
+#define makedev(ma, mi) (((dev_t)(ma) << 8) | ((dev_t)(mi) & 0xff))
 
 #endif /* _SYS_STAT_H */

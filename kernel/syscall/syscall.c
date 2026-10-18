@@ -107,6 +107,8 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_pivot_root((const char *)a1, (const char *)a2);
         case SYS_mount:
             return sys_mount((const char *)a1, (const char *)a2, (const char *)a3, (unsigned long)a4, (const void *)a5);
+        case SYS_mknod:
+            return sys_mknod((const char *)a1, (mode_t)a2, (dev_t)a3);
         default:
             printk("<4>[SYSCALL] Unimplemented syscall %llu\n", (unsigned long long)num);
             return -ENOSYS;

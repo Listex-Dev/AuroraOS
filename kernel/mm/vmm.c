@@ -251,3 +251,16 @@ void vmm_destroy_user_space(uint64_t *pml4)
 
     pmm_free_page(vmm_virt_to_phys_direct(pml4));
 }
+
+void *vmm_map_mmio(uint64_t phys_addr, size_t size)
+{
+    uint64_t start_page = phys_addr & ~0xFFFULL;
+    uint64_t end_page = (phys_addr + size + PAGE_SIZE - 1) & ~0xFFFULL;
+    uint64_t *k_pml4 = vmm_get_kernel_pml4();
+
+    for (uint64_t p = start_page; p < end_page; p += PAGE_SIZE) {
+        vmm_map_page(k_pml4, KERNEL_DIRECT_MAP_BASE + p, p, PTE_WRITABLE);
+    }
+
+    return (void *)(KERNEL_DIRECT_MAP_BASE + phys_addr);
+}

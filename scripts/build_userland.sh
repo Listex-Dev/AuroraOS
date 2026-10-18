@@ -18,7 +18,7 @@ echo "  AR build/libc/libc.a"
 ar rcs build/libc/libc.a build/libc/*.o
 
 echo "=== Building AuroraOS User Utilities ==="
-for bin in ls cat cp ps vi grep sleep test_m10 sh getty login init test_m11; do
+for bin in ls cat cp ps vi grep sleep test_m10 sh getty login init test_m11 mknod fdisk mount test_m12; do
     echo "  CC/LD user bin: $bin"
     gcc $CFLAGS -static user/bin/${bin}.c build/libc/crt0.o build/libc/libc.a -o build/bin/${bin}
 done

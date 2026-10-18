@@ -8,6 +8,7 @@
 #include <aurora/string.h>
 #include <aurora/printk.h>
 #include <aurora/errno.h>
+#include <aurora/drivers/block.h>
 
 struct proc_node {
     proc_read_fn generator;
@@ -135,7 +136,30 @@ static ssize_t gen_devices(char *buf, size_t max_len)
                     "  4 tty\n"
                     "  5 tty\n\n"
                     "Block devices:\n"
+                    "  1 ramdisk\n"
                     "  8 sd\n");
+}
+
+static ssize_t gen_partitions(char *buf, size_t max_len)
+{
+    size_t off = 0;
+    int len = snprintf(buf + off, max_len - off, "major minor  #blocks  name\n\n");
+    if (len > 0) off += (size_t)len;
+
+    for (struct block_device *b = bdev_get_list(); b != NULL; b = b->next) {
+        uint32_t major = (uint32_t)(b->dev_id >> 8);
+        uint32_t minor = (uint32_t)(b->dev_id & 0xFF);
+        uint64_t blocks_1k = (b->total_blocks * b->block_size) / 1024;
+        len = snprintf(buf + off, max_len - off, "%4u  %4u %10llu %s\n",
+                       major, minor, blocks_1k, b->name);
+        if (len > 0 && off + (size_t)len < max_len) {
+            off += (size_t)len;
+        } else {
+            break;
+        }
+    }
+
+    return (ssize_t)off;
 }
 
 static ssize_t gen_mounts(char *buf, size_t max_len)
@@ -229,6 +253,7 @@ struct super_block *procfs_create(void)
     create_proc_file(sb, root_dentry, "cmdline", gen_cmdline);
     create_proc_file(sb, root_dentry, "filesystems", gen_filesystems);
     create_proc_file(sb, root_dentry, "devices", gen_devices);
+    create_proc_file(sb, root_dentry, "partitions", gen_partitions);
     create_proc_file(sb, root_dentry, "mounts", gen_mounts);
 
     /* /proc/self directory */

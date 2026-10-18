@@ -1,5 +1,6 @@
 #include <aurora/fs/m8_test.h>
 #include <aurora/drivers/block.h>
+#include <aurora/drivers/ahci.h>
 #include <aurora/drivers/ata.h>
 #include <aurora/drivers/ramdisk.h>
 #include <aurora/fs/ext2.h>
@@ -34,12 +35,13 @@ bool test_ext4_root_subsystem(void)
 
     /* 1. Initialize Block Device Subsystem */
     block_subsys_init();
+    ahci_init();
     ata_init();
     ramdisk_init(32 * 1024 * 1024); /* 32 MB ramdisk /dev/ram0 */
 
-    struct block_device *test_bdev = bdev_get("sda");
+    struct block_device *test_bdev = bdev_get("ram0");
     if (!test_bdev) {
-        test_bdev = bdev_get("ram0");
+        test_bdev = bdev_get("sda");
     }
 
     if (!test_bdev) {
