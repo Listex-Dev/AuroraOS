@@ -55,23 +55,102 @@ int64_t sys_getegid(void)
     return curr ? curr->egid : 0;
 }
 
+int64_t sys_umask(mode_t mask)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+    mode_t old_mask = curr->umask;
+    curr->umask = mask & 0777;
+    return old_mask;
+}
+
 int64_t sys_setuid(uid_t uid)
 {
     task_t *curr = sched_current();
-    if (curr) {
+    if (!curr) return -ESRCH;
+
+    if (curr->euid == 0) {
         curr->uid = uid;
         curr->euid = uid;
+        curr->suid = uid;
+        return 0;
+    } else {
+        if (uid == curr->uid || uid == curr->suid) {
+            curr->euid = uid;
+            return 0;
+        }
+        return -EPERM;
     }
-    return 0;
 }
 
 int64_t sys_setgid(gid_t gid)
 {
     task_t *curr = sched_current();
-    if (curr) {
+    if (!curr) return -ESRCH;
+
+    if (curr->euid == 0) {
         curr->gid = gid;
         curr->egid = gid;
+        curr->sgid = gid;
+        return 0;
+    } else {
+        if (gid == curr->gid || gid == curr->sgid) {
+            curr->egid = gid;
+            return 0;
+        }
+        return -EPERM;
     }
+}
+
+int64_t sys_setreuid(uid_t ruid, uid_t euid)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+
+    if (curr->euid == 0) {
+        if (ruid != (uid_t)-1) curr->uid = ruid;
+        if (euid != (uid_t)-1) curr->euid = euid;
+        if (ruid != (uid_t)-1 || (euid != (uid_t)-1 && euid != curr->uid)) {
+            curr->suid = curr->euid;
+        }
+        return 0;
+    }
+
+    if (ruid != (uid_t)-1 && ruid != curr->uid && ruid != curr->euid) {
+        return -EPERM;
+    }
+    if (euid != (uid_t)-1 && euid != curr->uid && euid != curr->euid && euid != curr->suid) {
+        return -EPERM;
+    }
+
+    if (ruid != (uid_t)-1) curr->uid = ruid;
+    if (euid != (uid_t)-1) curr->euid = euid;
+    return 0;
+}
+
+int64_t sys_setregid(gid_t rgid, gid_t egid)
+{
+    task_t *curr = sched_current();
+    if (!curr) return -ESRCH;
+
+    if (curr->euid == 0) {
+        if (rgid != (gid_t)-1) curr->gid = rgid;
+        if (egid != (gid_t)-1) curr->egid = egid;
+        if (rgid != (gid_t)-1 || (egid != (gid_t)-1 && egid != curr->gid)) {
+            curr->sgid = curr->egid;
+        }
+        return 0;
+    }
+
+    if (rgid != (gid_t)-1 && rgid != curr->gid && rgid != curr->egid) {
+        return -EPERM;
+    }
+    if (egid != (gid_t)-1 && egid != curr->gid && egid != curr->egid && egid != curr->sgid) {
+        return -EPERM;
+    }
+
+    if (rgid != (gid_t)-1) curr->gid = rgid;
+    if (egid != (gid_t)-1) curr->egid = egid;
     return 0;
 }
 
@@ -145,6 +224,13 @@ int64_t sys_fork(void)
     child->state = TASK_RUNNING;
     child->time_slice = DEFAULT_TIME_SLICE;
     child->parent = curr;
+    child->uid = curr->uid;
+    child->euid = curr->euid;
+    child->suid = curr->suid;
+    child->gid = curr->gid;
+    child->egid = curr->egid;
+    child->sgid = curr->sgid;
+    child->umask = curr->umask;
     child->brk_start = curr->brk_start;
     child->brk_current = curr->brk_current;
     strncpy(child->comm, curr->comm, sizeof(child->comm) - 1);
@@ -224,20 +310,30 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
     void *vfs_elf_buf = NULL;
     size_t binary_size = 0;
     const void *elf_data = NULL;
+    mode_t bin_mode = 0;
+    uid_t bin_uid = 0;
+    gid_t bin_gid = 0;
+    bool bin_has_stat = false;
 
     int vfs_fd = sys_open(kfilename, O_RDONLY, 0);
     if (vfs_fd >= 0) {
         struct stat st;
-        if (sys_fstat(vfs_fd, &st) == 0 && st.st_size > 0 && st.st_size < 16 * 1024 * 1024) {
-            vfs_elf_buf = kmalloc(st.st_size, GFP_KERNEL);
-            if (vfs_elf_buf) {
-                ssize_t rd = sys_read(vfs_fd, vfs_elf_buf, st.st_size);
-                if (rd == (ssize_t)st.st_size) {
-                    elf_data = vfs_elf_buf;
-                    binary_size = st.st_size;
-                } else {
-                    kfree(vfs_elf_buf);
-                    vfs_elf_buf = NULL;
+        if (sys_fstat(vfs_fd, &st) == 0) {
+            bin_mode = st.st_mode;
+            bin_uid = st.st_uid;
+            bin_gid = st.st_gid;
+            bin_has_stat = true;
+            if (st.st_size > 0 && st.st_size < 16 * 1024 * 1024) {
+                vfs_elf_buf = kmalloc(st.st_size, GFP_KERNEL);
+                if (vfs_elf_buf) {
+                    ssize_t rd = sys_read(vfs_fd, vfs_elf_buf, st.st_size);
+                    if (rd == (ssize_t)st.st_size) {
+                        elf_data = vfs_elf_buf;
+                        binary_size = st.st_size;
+                    } else {
+                        kfree(vfs_elf_buf);
+                        vfs_elf_buf = NULL;
+                    }
                 }
             }
         }
@@ -285,7 +381,7 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
         return ret;
     }
 
-    /* 3. Allocate and map user stack (16 KiB = 4 pages) */
+    /* 3. Allocate and map user stack (16 KiB = 4 pages) with NX (No-Execute) protection */
     #define USER_STACK_TOP 0x00007FFFF0000000ULL
     #define USER_STACK_PAGES 4
     for (uint64_t p = 0; p < USER_STACK_PAGES; p++) {
@@ -297,7 +393,7 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
         vmm_map_page(new_pml4,
                      USER_STACK_TOP - (p + 1) * PAGE_SIZE,
                      stack_phys,
-                     PTE_USER | PTE_WRITABLE);
+                     PTE_USER | PTE_WRITABLE | PTE_NX);
     }
 
     /* 4. Construct System V AMD64 ABI user stack */
@@ -336,6 +432,18 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
 
     printk("<6>[EXECVE] Process PID %d executing '%s': entry=%p, rsp=%p, argc=%d\n",
            curr->pid, curr->comm, (void *)entry_point, (void *)user_sp, argc);
+
+    /* Apply S_ISUID / S_ISGID credentials */
+    if (bin_has_stat) {
+        if (bin_mode & S_ISUID) {
+            curr->euid = bin_uid;
+            curr->suid = bin_uid;
+        }
+        if (bin_mode & S_ISGID) {
+            curr->egid = bin_gid;
+            curr->sgid = bin_gid;
+        }
+    }
 
     /* 7. Reset user registers to start executing the new program */
     if (curr->regs) {

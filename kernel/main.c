@@ -42,6 +42,7 @@
 #include <aurora/drivers/m12_test.h>
 #include <aurora/net/m13_test.h>
 #include <aurora/net/m14_test.h>
+#include <aurora/proc/m15_test.h>
 #include <aurora/net/dhcp.h>
 #include <aurora/net/netdev.h>
 #include <aurora/net/arp.h>
@@ -61,14 +62,22 @@ static void init_trampoline(void)
     enter_usermode(g_init_entry, g_init_sp);
 }
 
-static void launch_init_process(void)
+void security_subsys_init(void)
 {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+
     sys_mkdir("/etc", 0755);
     sys_mkdir("/bin", 0755);
     sys_mkdir("/sbin", 0755);
     sys_mkdir("/tmp", 0777);
     sys_mkdir("/run", 0755);
     sys_mkdir("/root", 0700);
+    sys_mkdir("/home", 0755);
+    sys_mkdir("/home/aurora", 0755);
+    sys_mkdir("/var", 0755);
+    sys_mkdir("/var/log", 0755);
 
     int fd = sys_open("/etc/issue", O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
@@ -89,10 +98,43 @@ static void launch_init_process(void)
     fd = sys_open("/etc/passwd", O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
         const char *pw = "root:x:0:0:root:/root:/bin/sh\n"
+                         "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
                          "aurora:x:1000:1000:Aurora User:/home/aurora:/bin/sh\n";
         sys_write(fd, pw, strlen(pw));
         sys_close(fd);
     }
+
+    fd = sys_open("/etc/shadow", O_WRONLY | O_CREAT | O_TRUNC, 0640);
+    if (fd >= 0) {
+        const char *sh = "root:$6$saltsalt$FCtXpTmG7SvkmMFnnZIotZMsxPcyMf9rYNlYFfsA2Fau3J9awLnj6tPMJW6qxQdpHAgjs0cvMWQ2Ve2HWIdX2/:19000:0:99999:7:::\n"
+                         "aurora:$6$saltsalt$VcYMCBfELnOcDK8outogXZyOp5rTpzY5E2LZQKa6N.QAElzmqtqwgRygFvpH/3Mcts8sy/gn7EtOsH5Rw/Xw4/:19000:0:99999:7:::\n";
+        sys_write(fd, sh, strlen(sh));
+        sys_close(fd);
+    }
+
+    fd = sys_open("/etc/group", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) {
+        const char *grp = "root:x:0:root\n"
+                          "wheel:x:10:root\n"
+                          "shadow:x:42:root\n"
+                          "tty:x:5:\n"
+                          "disk:x:6:\n"
+                          "users:x:1000:aurora\n";
+        sys_write(fd, grp, strlen(grp));
+        sys_close(fd);
+    }
+
+    fd = sys_open("/var/log/auth.log", O_WRONLY | O_CREAT | O_TRUNC, 0640);
+    if (fd >= 0) {
+        const char *auth_init = "System security and audit logging initialized.\n";
+        sys_write(fd, auth_init, strlen(auth_init));
+        sys_close(fd);
+    }
+}
+
+static void launch_init_process(void)
+{
+    security_subsys_init();
 
     /* Allocate address space for PID 1 */
     uintptr_t pml4_phys = pmm_alloc_page();
@@ -139,7 +181,7 @@ static void launch_init_process(void)
         vmm_map_page(user_pml4,
                      USER_STACK_TOP - (p + 1) * PAGE_SIZE,
                      stack_phys,
-                     PTE_USER | PTE_WRITABLE);
+                     PTE_USER | PTE_WRITABLE | PTE_NX);
     }
 
     /* Setup user stack with argc/argv/envp */
@@ -245,6 +287,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
         test_m12_block_and_pci_subsystem();
         test_m13_network_subsystem();
         test_m14_services_and_pty_subsystem();
+        test_m15_security_subsystem();
     } else {
         /* Interactive Production Boot: initialize drivers and start PID 1 */
         pci_init();

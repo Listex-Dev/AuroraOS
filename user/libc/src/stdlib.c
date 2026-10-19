@@ -53,6 +53,17 @@ void abort(void)
     _exit(134);
 }
 
+uintptr_t __stack_chk_guard = 0x595e9fbd94fda766ULL;
+
+void __attribute__((noreturn)) __stack_chk_fail(void)
+{
+    fputs("*** stack smashing detected ***: terminated\n", stderr);
+    kill(getpid(), SIGABRT);
+    while (1) {
+        _exit(134);
+    }
+}
+
 void __assert_fail(const char *expr, const char *file, int line, const char *func)
 {
     fprintf(stderr, "Assertion failed: %s (%s: %s: %d)\n", expr, file, func ? func : "?", line);

@@ -202,7 +202,7 @@ uint64_t *vmm_clone_user_space(uint64_t *src_pml4)
                         void *dst_data = vmm_phys_to_virt(child_phys);
                         memcpy(dst_data, src_data, PAGE_SIZE);
 
-                        uint64_t flags = pt[pt_i] & 0xFFF;
+                        uint64_t flags = (pt[pt_i] & 0xFFF) | (pt[pt_i] & PTE_NX);
                         vmm_map_page(dst_pml4, vaddr, child_phys, flags);
                     }
                 }

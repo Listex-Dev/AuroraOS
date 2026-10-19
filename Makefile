@@ -90,7 +90,8 @@ C_SRCS  := kernel/main.c \
            kernel/net/dhcp.c \
            kernel/drivers/net/e1000.c \
            kernel/net/m13_test.c \
-           kernel/net/m14_test.c
+           kernel/net/m14_test.c \
+           kernel/proc/m15_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -134,7 +135,11 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/ifconfig \
               $(BUILD_DIR)/bin/netstat \
               $(BUILD_DIR)/bin/wget \
-              $(BUILD_DIR)/bin/test_m14
+              $(BUILD_DIR)/bin/test_m14 \
+              $(BUILD_DIR)/bin/id \
+              $(BUILD_DIR)/bin/su \
+              $(BUILD_DIR)/bin/chmod \
+              $(BUILD_DIR)/bin/test_m15
 
 .PHONY: all kernel run run-term debug test clean
 
@@ -214,7 +219,7 @@ debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 
 test: $(TARGET_BIN) $(DISK_IMG)
 	@echo "Running Milestone automated acceptance test..."
-	@output=$$(timeout 20s qemu-system-x86_64 \
+	@output=$$(timeout 30s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) -append "test" \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
@@ -223,13 +228,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M14 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M15 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M14 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M15 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M14 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M15 verification failed! <<<"; \
 		exit 1; \
 	fi
 

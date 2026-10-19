@@ -42,6 +42,9 @@
 #define SYS_mkdir      83
 #define SYS_rmdir      84
 #define SYS_unlink     87
+#define SYS_chmod      90
+#define SYS_fchmod     91
+#define SYS_umask      95
 #define SYS_getuid     102
 #define SYS_getgid     104
 #define SYS_setuid     105
@@ -52,9 +55,12 @@
 #define SYS_getppid    110
 #define SYS_getpgrp    111
 #define SYS_setsid     112
+#define SYS_setreuid   113
+#define SYS_setregid   114
 #define SYS_getpgid    121
 #define SYS_mknod      133
 #define SYS_pivot_root 155
+#define SYS_arch_prctl 158
 #define SYS_mount      165
 #define SYS_umount2    166
 #define SYS_getdents64 217
@@ -107,5 +113,11 @@ int64_t sys_setpgid(pid_t pid, pid_t pgid);
 int64_t sys_getpgrp(void);
 int64_t sys_setsid(void);
 int64_t sys_getpgid(pid_t pid);
+int64_t sys_umask(mode_t mask);
+int64_t sys_setreuid(uid_t ruid, uid_t euid);
+int64_t sys_setregid(gid_t rgid, gid_t egid);
+int64_t sys_chmod(const char *pathname, mode_t mode);
+int64_t sys_fchmod(int fd, mode_t mode);
+int64_t sys_arch_prctl(int code, unsigned long addr);
 
 #endif /* _AURORA_SYSCALL_H */

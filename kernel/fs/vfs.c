@@ -79,6 +79,40 @@ void vfs_init(void)
     printk("<6>[  0.000000] VFS: Virtual File System initialized with root RamFS at /\n");
 }
 
+int inode_permission(struct inode *inode, int mask)
+{
+    if (!inode) {
+        return -EINVAL;
+    }
+
+    task_t *curr = sched_current();
+    if (!curr || curr->euid == 0) {
+        /* Superuser bypasses read/write permissions.
+         * For execute, requires at least one execute bit or directory. */
+        if (mask & 1) { /* MAY_EXEC */
+            if (S_ISDIR(inode->i_mode) || (inode->i_mode & 0111)) {
+                return 0;
+            }
+            return -EACCES;
+        }
+        return 0;
+    }
+
+    int mode_bits = 0;
+    if (curr->euid == inode->i_uid) {
+        mode_bits = (inode->i_mode >> 6) & 7;
+    } else if (curr->egid == inode->i_gid) {
+        mode_bits = (inode->i_mode >> 3) & 7;
+    } else {
+        mode_bits = inode->i_mode & 7;
+    }
+
+    if ((mask & 4) && !(mode_bits & 4)) return -EACCES; /* MAY_READ */
+    if ((mask & 2) && !(mode_bits & 2)) return -EACCES; /* MAY_WRITE */
+    if ((mask & 1) && !(mode_bits & 1)) return -EACCES; /* MAY_EXEC */
+    return 0;
+}
+
 int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
 {
     if (!path || !res) {
@@ -99,6 +133,12 @@ int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
             return -ENOENT;
         }
 
+        /* Check write permission on parent directory */
+        int perr = inode_permission(parent->d_inode, 2);
+        if (perr < 0) {
+            return perr;
+        }
+
         if (!parent->d_inode->i_op || !parent->d_inode->i_op->create) {
             return -EPERM;
         }
@@ -108,10 +148,24 @@ int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
             return -ENOMEM;
         }
 
-        int err = parent->d_inode->i_op->create(parent->d_inode, dentry, mode);
+        task_t *curr = sched_current();
+        mode_t effective_mode = mode;
+        if (curr) {
+            effective_mode = mode & ~curr->umask;
+        }
+
+        int err = parent->d_inode->i_op->create(parent->d_inode, dentry, effective_mode);
         if (err < 0) {
             dentry_free(dentry);
             return err;
+        }
+
+        if (dentry->d_inode) {
+            if (curr) {
+                dentry->d_inode->i_uid = curr->euid;
+                dentry->d_inode->i_gid = curr->egid;
+            }
+            dentry->d_inode->i_mode = (dentry->d_inode->i_mode & ~07777) | (effective_mode & 07777);
         }
     } else if ((flags & O_CREAT) && (flags & O_EXCL)) {
         return -EEXIST;
@@ -120,6 +174,19 @@ int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
     struct inode *inode = dentry->d_inode;
     if (!inode) {
         return -ENOENT;
+    }
+
+    /* Check DAC permissions for requested open access mode */
+    int req_mask = 0;
+    int acc = (flags & O_ACCMODE);
+    if (acc == O_RDONLY) req_mask |= 4;
+    else if (acc == O_WRONLY) req_mask |= 2;
+    else if (acc == O_RDWR) req_mask |= 6;
+    if (flags & (O_TRUNC | O_APPEND)) req_mask |= 2;
+
+    int perr = inode_permission(inode, req_mask);
+    if (perr < 0) {
+        return perr;
     }
 
     if (S_ISDIR(inode->i_mode) && ((flags & O_ACCMODE) != O_RDONLY)) {
@@ -310,15 +377,34 @@ int vfs_mkdir(const char *path, mode_t mode)
         return -EPERM;
     }
 
+    task_t *curr = sched_current();
+    if (parent->d_inode) {
+        int perr = inode_permission(parent->d_inode, 2);
+        if (perr < 0) return perr;
+    }
+
+    mode_t effective_mode = mode;
+    if (curr) {
+        effective_mode = mode & ~curr->umask;
+    }
+
     struct dentry *child = dentry_create(last_comp, parent, NULL);
     if (!child) {
         return -ENOMEM;
     }
 
-    int err = parent->d_inode->i_op->mkdir(parent->d_inode, child, mode);
+    int err = parent->d_inode->i_op->mkdir(parent->d_inode, child, effective_mode);
     if (err < 0) {
         dentry_free(child);
         return err;
+    }
+
+    if (child->d_inode) {
+        if (curr) {
+            child->d_inode->i_uid = curr->euid;
+            child->d_inode->i_gid = curr->egid;
+        }
+        child->d_inode->i_mode = (child->d_inode->i_mode & ~07777) | (effective_mode & 07777);
     }
 
     return 0;
@@ -403,5 +489,39 @@ int vfs_mknod(const char *path, mode_t mode, dev_t dev)
         return -ENOMEM;
     }
 
+    return 0;
+}
+
+int64_t sys_chmod(const char *pathname, mode_t mode)
+{
+    if (!pathname) return -EFAULT;
+    struct dentry *d = vfs_namei(pathname);
+    if (!d || !d->d_inode) return -ENOENT;
+
+    task_t *curr = sched_current();
+    if (curr && curr->euid != 0 && curr->euid != d->d_inode->i_uid) {
+        return -EPERM;
+    }
+
+    d->d_inode->i_mode = (d->d_inode->i_mode & ~07777) | (mode & 07777);
+    return 0;
+}
+
+int64_t sys_fchmod(int fd, mode_t mode)
+{
+    task_t *curr = sched_current();
+    if (!curr || !curr->files) return -EBADF;
+
+    struct files_struct *files = (struct files_struct *)curr->files;
+    if (fd < 0 || fd >= NR_OPEN || !files->fd[fd]) return -EBADF;
+
+    struct inode *inode = files->fd[fd]->f_inode;
+    if (!inode) return -EBADF;
+
+    if (curr->euid != 0 && curr->euid != inode->i_uid) {
+        return -EPERM;
+    }
+
+    inode->i_mode = (inode->i_mode & ~07777) | (mode & 07777);
     return 0;
 }

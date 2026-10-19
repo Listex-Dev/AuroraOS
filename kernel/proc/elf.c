@@ -74,6 +74,9 @@ int elf64_load_pml4(uint64_t *pml4, const void *elf_data, size_t elf_size, uint6
 
             /* Determine page permissions */
             uint64_t pte_flags = PTE_USER | PTE_WRITABLE;
+            if (!(phdr->p_flags & PF_X)) {
+                pte_flags |= PTE_NX;
+            }
 
             /* Map required virtual pages */
             for (uint64_t v = seg_start; v < seg_end; v += PAGE_SIZE) {

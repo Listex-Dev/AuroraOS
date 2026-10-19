@@ -5,6 +5,12 @@
 
 .section .text
 _start:
+    /* 0. Set up Thread Local Storage (%fs) for stack protector at %fs:0x28 */
+    mov $158, %rax          /* SYS_arch_prctl */
+    mov $0x1002, %rdi       /* ARCH_SET_FS */
+    lea __tls_area(%rip), %rsi
+    syscall
+
     /* 1. Clear frame pointer */
     xor %rbp, %rbp
 
@@ -31,3 +37,10 @@ _start:
     call exit
 
 1:  jmp 1b
+
+.section .data
+.align 16
+__tls_area:
+    .fill 5, 8, 0
+    .quad 0x595e9fbd94fda766   /* Offset 0x28 (40 bytes): stack protector canary */
+    .fill 10, 8, 0

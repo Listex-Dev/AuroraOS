@@ -1,5 +1,5 @@
 /*
- * AuroraOS /bin/login - User authentication and shell initialization
+ * AuroraOS /bin/login - User authentication with shadow verification and lockout
  */
 
 #include <stdio.h>
@@ -8,7 +8,20 @@
 #include <unistd.h>
 #include <termios.h>
 #include <pwd.h>
+#include <shadow.h>
+#include <crypt.h>
+#include <fcntl.h>
 #include <errno.h>
+#include <stdbool.h>
+
+static void log_auth(const char *msg)
+{
+    int fd = open("/var/log/auth.log", O_WRONLY | O_CREAT | O_APPEND, 0640);
+    if (fd >= 0) {
+        write(fd, msg, strlen(msg));
+        close(fd);
+    }
+}
 
 static void get_password_no_echo(const char *prompt, char *buf, size_t max_len)
 {
@@ -33,7 +46,6 @@ static void get_password_no_echo(const char *prompt, char *buf, size_t max_len)
         fflush(stdout);
     }
 
-    /* Trim newline */
     size_t len = strlen(buf);
     while (len > 0 && (buf[len - 1] == '\n' || buf[len - 1] == '\r')) {
         buf[--len] = '\0';
@@ -47,65 +59,84 @@ int main(int argc, char **argv)
 
     if (argc > 1) {
         strncpy(username, argv[1], sizeof(username) - 1);
-    } else {
-        printf("aurora login: ");
-        fflush(stdout);
-        if (!fgets(username, sizeof(username), stdin)) {
+        username[sizeof(username) - 1] = '\0';
+    }
+
+    int attempts = 0;
+    struct passwd *pw = NULL;
+
+    while (attempts < 3) {
+        if (username[0] == '\0') {
+            printf("aurora login: ");
+            fflush(stdout);
+            if (!fgets(username, sizeof(username), stdin)) {
+                return 1;
+            }
+            size_t len = strlen(username);
+            while (len > 0 && (username[len - 1] == '\n' || username[len - 1] == '\r')) {
+                username[--len] = '\0';
+            }
+        }
+
+        if (username[0] == '\0') {
+            attempts++;
+            continue;
+        }
+
+        char password[128];
+        password[0] = '\0';
+        get_password_no_echo("Password: ", password, sizeof(password));
+
+        pw = getpwnam(username);
+        struct spwd *sp = getspnam(username);
+
+        bool authenticated = false;
+        if (pw && sp && sp->sp_pwdp && password[0] != '\0') {
+            char *hash = crypt(password, sp->sp_pwdp);
+            if (hash && strcmp(hash, sp->sp_pwdp) == 0) {
+                authenticated = true;
+            }
+        }
+
+        if (authenticated) {
+            char logmsg[256];
+            snprintf(logmsg, sizeof(logmsg), "login: Successful authentication for user '%s'\n", username);
+            log_auth(logmsg);
+            break;
+        }
+
+        attempts++;
+        printf("Login incorrect\n");
+        char logmsg[256];
+        snprintf(logmsg, sizeof(logmsg), "login: FAILED authentication attempt %d for user '%s'\n", attempts, username);
+        log_auth(logmsg);
+
+        if (attempts >= 3) {
+            printf("Too many failed attempts. Delaying...\n");
+            sleep(3);
             return 1;
         }
-        size_t len = strlen(username);
-        while (len > 0 && (username[len - 1] == '\n' || username[len - 1] == '\r')) {
-            username[--len] = '\0';
-        }
+
+        username[0] = '\0';
     }
 
-    if (username[0] == '\0') {
-        return 1;
-    }
-
-    /* Prompt password (optional verification for root) */
-    char password[128];
-    password[0] = '\0';
-    if (isatty(STDIN_FILENO)) {
-        get_password_no_echo("Password: ", password, sizeof(password));
-    }
-
-    /* Check user credentials */
-    uid_t uid = 0;
-    gid_t gid = 0;
-    const char *home = "/root";
-    const char *shell = "/bin/sh";
-
-    struct passwd *pw = getpwnam(username);
-    if (pw) {
-        uid = pw->pw_uid;
-        gid = pw->pw_gid;
-        if (pw->pw_dir && pw->pw_dir[0]) home = pw->pw_dir;
-        if (pw->pw_shell && pw->pw_shell[0]) shell = pw->pw_shell;
-    } else if (strcmp(username, "root") == 0) {
-        uid = 0;
-        gid = 0;
-        home = "/root";
-        shell = "/bin/sh";
-    } else {
-        printf("Login incorrect\n");
-        sleep(2);
+    if (!pw) {
         return 1;
     }
 
     /* Apply credentials */
-    setgid(gid);
-    setuid(uid);
+    setregid(pw->pw_gid, pw->pw_gid);
+    setreuid(pw->pw_uid, pw->pw_uid);
 
     /* Setup session environment */
-    setenv("USER", username, 1);
-    setenv("LOGNAME", username, 1);
-    setenv("HOME", home, 1);
-    setenv("SHELL", shell, 1);
-    setenv("PATH", "/bin:/usr/bin", 1);
+    setenv("USER", pw->pw_name, 1);
+    setenv("LOGNAME", pw->pw_name, 1);
+    setenv("HOME", pw->pw_dir ? pw->pw_dir : "/", 1);
+    setenv("SHELL", pw->pw_shell ? pw->pw_shell : "/bin/sh", 1);
+    setenv("PATH", (pw->pw_uid == 0) ? "/sbin:/bin:/usr/sbin:/usr/bin" : "/bin:/usr/bin", 1);
     setenv("TERM", "linux", 1);
 
-    /* Change directory to HOME or / */
+    const char *home = pw->pw_dir ? pw->pw_dir : "/";
     if (chdir(home) != 0) {
         chdir("/");
     }
@@ -124,6 +155,7 @@ int main(int argc, char **argv)
     fflush(stdout);
 
     /* Launch user shell */
+    const char *shell = pw->pw_shell ? pw->pw_shell : "/bin/sh";
     char *sh_argv[] = { (char *)shell, NULL };
     execve(shell, sh_argv, environ);
 

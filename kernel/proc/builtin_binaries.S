@@ -29,6 +29,10 @@
 .global bin_netstat_start, bin_netstat_end
 .global bin_wget_start, bin_wget_end
 .global bin_test_m14_start, bin_test_m14_end
+.global bin_id_start, bin_id_end
+.global bin_su_start, bin_su_end
+.global bin_chmod_start, bin_chmod_end
+.global bin_test_m15_start, bin_test_m15_end
 
 .align 16
 bin_hello_start:
@@ -159,4 +163,24 @@ bin_wget_end:
 bin_test_m14_start:
     .incbin "build/bin/test_m14"
 bin_test_m14_end:
+
+.align 16
+bin_id_start:
+    .incbin "build/bin/id"
+bin_id_end:
+
+.align 16
+bin_su_start:
+    .incbin "build/bin/su"
+bin_su_end:
+
+.align 16
+bin_chmod_start:
+    .incbin "build/bin/chmod"
+bin_chmod_end:
+
+.align 16
+bin_test_m15_start:
+    .incbin "build/bin/test_m15"
+bin_test_m15_end:
 

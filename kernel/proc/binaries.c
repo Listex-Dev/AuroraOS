@@ -27,6 +27,10 @@ extern char bin_ifconfig_start[], bin_ifconfig_end[];
 extern char bin_netstat_start[],  bin_netstat_end[];
 extern char bin_wget_start[],     bin_wget_end[];
 extern char bin_test_m14_start[], bin_test_m14_end[];
+extern char bin_id_start[],       bin_id_end[];
+extern char bin_su_start[],       bin_su_end[];
+extern char bin_chmod_start[],    bin_chmod_end[];
+extern char bin_test_m15_start[], bin_test_m15_end[];
 
 struct binary_entry {
     const char *path;
@@ -65,6 +69,11 @@ static const struct binary_entry builtin_table[] = {
     { "/bin/netstat",  bin_netstat_start,  bin_netstat_end },
     { "/bin/wget",     bin_wget_start,     bin_wget_end },
     { "/bin/test_m14", bin_test_m14_start, bin_test_m14_end },
+    { "/bin/id",       bin_id_start,       bin_id_end },
+    { "/usr/bin/id",   bin_id_start,       bin_id_end },
+    { "/bin/su",       bin_su_start,       bin_su_end },
+    { "/bin/chmod",    bin_chmod_start,    bin_chmod_end },
+    { "/bin/test_m15", bin_test_m15_start, bin_test_m15_end },
     { NULL, NULL, NULL }
 };
 

@@ -25,6 +25,7 @@ task_t *task_create(const char *name, void (*entry_point)(void))
     task->sid = task->pid;
     task->state = TASK_RUNNING;
     task->time_slice = DEFAULT_TIME_SLICE;
+    task->umask = 0022;
     strncpy(task->comm, name ? name : "kthread", sizeof(task->comm) - 1);
 
     /* Allocate process file descriptors and filesystem context */

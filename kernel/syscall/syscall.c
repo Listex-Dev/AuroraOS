@@ -130,6 +130,18 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_pivot_root((const char *)a1, (const char *)a2);
         case SYS_mount:
             return sys_mount((const char *)a1, (const char *)a2, (const char *)a3, (unsigned long)a4, (const void *)a5);
+        case SYS_chmod:
+            return sys_chmod((const char *)a1, (mode_t)a2);
+        case SYS_fchmod:
+            return sys_fchmod((int)a1, (mode_t)a2);
+        case SYS_umask:
+            return sys_umask((mode_t)a1);
+        case SYS_setreuid:
+            return sys_setreuid((uid_t)a1, (uid_t)a2);
+        case SYS_setregid:
+            return sys_setregid((gid_t)a1, (gid_t)a2);
+        case SYS_arch_prctl:
+            return sys_arch_prctl((int)a1, (unsigned long)a2);
         case SYS_mknod:
             return sys_mknod((const char *)a1, (mode_t)a2, (dev_t)a3);
         default:
@@ -138,11 +150,24 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
     }
 }
 
+int64_t sys_arch_prctl(int code, unsigned long addr)
+{
+    if (code == 0x1002) { /* ARCH_SET_FS */
+        wrmsr(MSR_FS_BASE, addr);
+        return 0;
+    } else if (code == 0x1003) { /* ARCH_GET_FS */
+        if (!addr) return -EFAULT;
+        *(uint64_t *)addr = rdmsr(MSR_FS_BASE);
+        return 0;
+    }
+    return -EINVAL;
+}
+
 void syscall_init(void)
 {
-    /* 1. Enable SCE (System Call Extensions) in EFER MSR (bit 0) */
+    /* 1. Enable SCE (bit 0) and NXE (bit 11) in EFER MSR */
     uint64_t efer = rdmsr(MSR_EFER);
-    wrmsr(MSR_EFER, efer | 1);
+    wrmsr(MSR_EFER, efer | 1 | (1ULL << 11));
 
     /*
      * 2. Configure MSR_STAR:

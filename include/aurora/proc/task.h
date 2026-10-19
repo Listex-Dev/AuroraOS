@@ -48,6 +48,7 @@ struct task_struct {
 
     uid_t uid, euid, suid;
     gid_t gid, egid, sgid;
+    mode_t umask;
 
     int state;
 

@@ -133,6 +133,26 @@ int setgid(gid_t gid)
     return (int)__syscall_ret(__syscall1(SYS_setgid, gid));
 }
 
+int setreuid(uid_t ruid, uid_t euid)
+{
+    return (int)__syscall_ret(__syscall2(SYS_setreuid, ruid, euid));
+}
+
+int setregid(gid_t rgid, gid_t egid)
+{
+    return (int)__syscall_ret(__syscall2(SYS_setregid, rgid, egid));
+}
+
+int seteuid(uid_t euid)
+{
+    return setreuid((uid_t)-1, euid);
+}
+
+int setegid(gid_t egid)
+{
+    return setregid((gid_t)-1, egid);
+}
+
 int setpgid(pid_t pid, pid_t pgid)
 {
     return (int)__syscall_ret(__syscall2(SYS_setpgid, pid, pgid));
@@ -268,14 +288,12 @@ int mount(const char *source, const char *target, const char *filesystemtype,
 
 int chmod(const char *pathname, mode_t mode)
 {
-    (void)pathname; (void)mode;
-    return 0;
+    return (int)__syscall_ret(__syscall2(SYS_chmod, (long)pathname, mode));
 }
 
 mode_t umask(mode_t mask)
 {
-    (void)mask;
-    return 0022;
+    return (mode_t)__syscall_ret(__syscall1(SYS_umask, mask));
 }
 
 pid_t wait(int *wstatus)

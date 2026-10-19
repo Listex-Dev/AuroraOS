@@ -140,6 +140,7 @@ void dentry_free(struct dentry *dentry);
 
 struct inode *inode_alloc(struct super_block *sb);
 void inode_free(struct inode *inode);
+int inode_permission(struct inode *inode, int mask);
 
 struct dentry *vfs_namei(const char *path);
 struct dentry *vfs_namei_parent(const char *path, char *last_comp);

@@ -42,6 +42,9 @@
 #define SYS_mkdir       83
 #define SYS_rmdir       84
 #define SYS_unlink      87
+#define SYS_chmod       90
+#define SYS_fchmod      91
+#define SYS_umask       95
 #define SYS_getuid     102
 #define SYS_getgid     104
 #define SYS_setuid     105
@@ -52,8 +55,11 @@
 #define SYS_getppid    110
 #define SYS_getpgrp    111
 #define SYS_setsid     112
+#define SYS_setreuid   113
+#define SYS_setregid   114
 #define SYS_getpgid    121
 #define SYS_mknod      133
+#define SYS_arch_prctl 158
 #define SYS_mount      165
 #define SYS_getdents64 217
 

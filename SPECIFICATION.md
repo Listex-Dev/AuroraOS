@@ -1092,7 +1092,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M12** | Блочные устройства: `pci`, `ata/ahci`, `/dev/sda*`, `mknod`, `major/minor` | `fdisk -l`, `mount /dev/sda2 /mnt` работают | `[x]` |
 | **M13** | Сеть: `eth` → `arp` → `ipv4` → `icmp`/`udp`/`tcp`, sockets, `lo`, `e1000`, `virtio-net` | `ping 10.0.2.2` получает ответы; TCP-соединение устанавливается | `[x]` |
 | **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[x]` |
-| **M15** | Безопасность: `passwd/shadow/group`, `su`, `login`, `umask`, `setuid`, NX, stack canaries | Вход по паролю; `su aurora` меняет UID; canary ловит переполнение | `[ ]` |
+| **M15** | Безопасность: `passwd/shadow/group`, `su`, `login`, `umask`, `setuid`, NX, stack canaries | Вход по паролю; `su aurora` меняет UID; canary ловит переполнение | `[x]` |
 | **M16** | Службы: `syslogd`, `crond`, `networking`, `sshd`, `init.d`, уровни | `sshd` принимает подключение с хоста; `crond` запускает задачу | `[ ]` |
 | **M17** | `pkg` + подпись + `/var/lib/pkg`, `man`-страницы для всех команд | `pkg install X` ставит и `man X` работает | `[ ]` |
 | **M18** | Тесты (unit/integration/posix), документация, `dmesg`, стабильность 24 ч | Прогон `make test` — 100 % зелёных; аптайм 24 ч без паники | `[ ]` |
@@ -1138,11 +1138,11 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 - [ ] Скрипт `/etc/init.d/` исполняется оболочкой без ошибок.
 
 ### 19.6 Безопасность
-- [ ] Вход без пароля невозможен; 3 неудачные попытки → задержка.
-- [ ] `/etc/shadow` имеет режим `0640` и недоступен обычному пользователю.
-- [ ] `su aurora` → `id` показывает `uid=1000`; обратный `su` требует пароль root.
-- [ ] Переполнение буфера в тестовой программе → `SIGABRT` (canary), а не выполнение кода.
-- [ ] `mmap(PROT_WRITE|PROT_EXEC)` вне явного запроса невозможен; NX активен.
+- [x] Вход без пароля невозможен; 3 неудачные попытки → задержка.
+- [x] `/etc/shadow` имеет режим `0640` и недоступен обычному пользователю.
+- [x] `su aurora` → `id` показывает `uid=1000`; обратный `su` требует пароль root.
+- [x] Переполнение буфера в тестовой программе → `SIGABRT` (canary), а не выполнение кода.
+- [x] `mmap(PROT_WRITE|PROT_EXEC)` вне явного запроса невозможен; NX активен.
 
 ### 19.7 Пакеты и службы
 - [ ] `pkg install` / `remove` / `upgrade-system` — атомарно, с проверкой подписи.
@@ -1352,9 +1352,9 @@ reboot: System halted
 [x] M10 libc + crt0 + сборка утилит
 [x] M11 /bin/sh + init + getty + login  →  ЛОГИН РАБОТАЕТ
 [x] M12 pci, ata/ahci, /dev/sda*, mknod, major:minor
-[ ] M13 eth/arp/ipv4/icmp/udp/tcp + sockets + e1000/virtio
-[ ] M14 DHCP, DNS, ifconfig, netstat, wget, pty
-[ ] M15 passwd/shadow/group, su, login, umask, setuid, NX, canaries
+[x] M13 eth/arp/ipv4/icmp/udp/tcp + sockets + e1000/virtio
+[x] M14 DHCP, DNS, ifconfig, netstat, wget, pty
+[x] M15 passwd/shadow/group, su, login, umask, setuid, NX, canaries
 [ ] M16 syslogd, crond, networking, sshd, init.d, runlevels
 [ ] M17 pkg + подписи + man-страницы
 [ ] M18 тесты, документация, 24h стабильность

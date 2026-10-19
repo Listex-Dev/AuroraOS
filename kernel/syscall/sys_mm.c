@@ -32,7 +32,7 @@ int64_t sys_brk(uintptr_t new_brk)
                 return -ENOMEM;
             }
             memset(vmm_phys_to_virt(phys), 0, PAGE_SIZE);
-            vmm_map_page(pml4, v, phys, PTE_USER | PTE_WRITABLE);
+            vmm_map_page(pml4, v, phys, PTE_USER | PTE_WRITABLE | PTE_NX);
         }
 
         curr->brk_current = new_brk;
