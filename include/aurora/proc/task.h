@@ -55,6 +55,7 @@ struct task_struct {
     void *mm;
     uint64_t cr3;
     uint64_t *pml4;
+    uint64_t fs_base;
     struct pt_regs *regs;
     void *files;
     void *fs;

@@ -5,6 +5,7 @@
 #include <aurora/panic.h>
 #include <aurora/arch/x86_64/cr.h>
 #include <aurora/arch/x86_64/tss.h>
+#include <aurora/arch/x86_64/msr.h>
 #include <aurora/mm/vmm.h>
 #include <aurora/mm/heap.h>
 
@@ -143,6 +144,12 @@ void sched_yield(void)
     } else if (!next->cr3 && read_cr3() != vmm_virt_to_phys_direct(vmm_get_kernel_pml4())) {
         write_cr3(vmm_virt_to_phys_direct(vmm_get_kernel_pml4()));
     }
+
+    /* Save current task FS base and restore next task's FS base */
+    if (prev) {
+        prev->fs_base = rdmsr(MSR_FS_BASE);
+    }
+    wrmsr(MSR_FS_BASE, next->fs_base);
 
     cpu_switch_to(prev, next);
 }

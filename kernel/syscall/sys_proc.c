@@ -8,6 +8,7 @@
 #include <aurora/mm/vmm.h>
 #include <aurora/mm/heap.h>
 #include <aurora/arch/x86_64/cr.h>
+#include <aurora/arch/x86_64/msr.h>
 #include <aurora/fs/vfs.h>
 #include <aurora/string.h>
 #include <aurora/printk.h>
@@ -231,6 +232,7 @@ int64_t sys_fork(void)
     child->egid = curr->egid;
     child->sgid = curr->sgid;
     child->umask = curr->umask;
+    child->fs_base = curr->fs_base;
     child->brk_start = curr->brk_start;
     child->brk_current = curr->brk_current;
     strncpy(child->comm, curr->comm, sizeof(child->comm) - 1);
@@ -445,6 +447,9 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
         }
     }
 
+    curr->fs_base = 0;
+    wrmsr(MSR_FS_BASE, 0);
+
     /* 7. Reset user registers to start executing the new program */
     if (curr->regs) {
         memset(curr->regs, 0, sizeof(struct pt_regs));
@@ -560,7 +565,7 @@ int64_t sys_kill(pid_t pid, int sig)
         int count = 0;
         for (size_t i = 0; i < sched_num_tasks(); i++) {
             task_t *t = sched_get_task_at(i);
-            if (t && t->pgid == pgrp && t->state != TASK_ZOMBIE && t->state != TASK_DEAD) {
+            if (t && t->pid != 1 && (pid == -1 || t->pgid == pgrp) && t->state != TASK_ZOMBIE && t->state != TASK_DEAD) {
                 if (sig > 0) {
                     printk("<6>[SIGNAL] Sent signal %d to PID %d ('%s', pgrp %d)\n",
                            sig, t->pid, t->comm, pgrp);
@@ -599,6 +604,10 @@ int64_t sys_kill(pid_t pid, int sig)
 
     if (sig == 0) {
         return 0; /* Process existence probe */
+    }
+
+    if (target->pid == 1 && (sig == SIGKILL || sig == SIGSTOP || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT)) {
+        return -EPERM;
     }
 
     printk("<6>[SIGNAL] Sent signal %d to PID %d ('%s')\n",

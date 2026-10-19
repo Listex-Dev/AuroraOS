@@ -55,7 +55,7 @@ void abort(void)
 
 uintptr_t __stack_chk_guard = 0x595e9fbd94fda766ULL;
 
-void __attribute__((noreturn)) __stack_chk_fail(void)
+void __attribute__((noreturn, optimize("no-stack-protector"))) __stack_chk_fail(void)
 {
     fputs("*** stack smashing detected ***: terminated\n", stderr);
     kill(getpid(), SIGABRT);

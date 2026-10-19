@@ -152,12 +152,16 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
 
 int64_t sys_arch_prctl(int code, unsigned long addr)
 {
+    task_t *curr = sched_current();
     if (code == 0x1002) { /* ARCH_SET_FS */
+        if (curr) {
+            curr->fs_base = addr;
+        }
         wrmsr(MSR_FS_BASE, addr);
         return 0;
     } else if (code == 0x1003) { /* ARCH_GET_FS */
         if (!addr) return -EFAULT;
-        *(uint64_t *)addr = rdmsr(MSR_FS_BASE);
+        *(uint64_t *)addr = curr ? curr->fs_base : rdmsr(MSR_FS_BASE);
         return 0;
     }
     return -EINVAL;
