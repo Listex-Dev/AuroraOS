@@ -643,6 +643,39 @@ int vsscanf(const char *str, const char *format, va_list ap)
                 }
                 assigned++;
             }
+        } else if (spec == '[') {
+            int invert = 0;
+            if (*f == '^') {
+                invert = 1;
+                f++;
+            }
+            char scanset[256] = {0};
+            if (*f == ']') {
+                scanset[(unsigned char)']'] = 1;
+                f++;
+            }
+            while (*f && *f != ']') {
+                scanset[(unsigned char)*f] = 1;
+                f++;
+            }
+            if (*f == ']') f++;
+
+            char *dst = suppress ? NULL : va_arg(ap, char *);
+            int max_w = (width > 0) ? width : 1000000;
+            int count = 0;
+            while (*s && count < max_w) {
+                int in_set = scanset[(unsigned char)*s];
+                if (invert ? in_set : !in_set) break;
+                if (dst) dst[count] = *s;
+                count++;
+                s++;
+            }
+            if (dst && count > 0) {
+                dst[count] = '\0';
+                assigned++;
+            } else if (count == 0) {
+                break;
+            }
         } else {
             break;
         }

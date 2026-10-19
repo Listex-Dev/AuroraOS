@@ -33,6 +33,15 @@
 .global bin_su_start, bin_su_end
 .global bin_chmod_start, bin_chmod_end
 .global bin_test_m15_start, bin_test_m15_end
+.global bin_syslogd_start, bin_syslogd_end
+.global bin_logger_start, bin_logger_end
+.global bin_crond_start, bin_crond_end
+.global bin_crontab_start, bin_crontab_end
+.global bin_sshd_start, bin_sshd_end
+.global bin_telinit_start, bin_telinit_end
+.global bin_touch_start, bin_touch_end
+.global bin_echo_start, bin_echo_end
+.global bin_test_m16_start, bin_test_m16_end
 
 .align 16
 bin_hello_start:
@@ -183,4 +192,49 @@ bin_chmod_end:
 bin_test_m15_start:
     .incbin "build/bin/test_m15"
 bin_test_m15_end:
+
+.align 16
+bin_syslogd_start:
+    .incbin "build/bin/syslogd"
+bin_syslogd_end:
+
+.align 16
+bin_logger_start:
+    .incbin "build/bin/logger"
+bin_logger_end:
+
+.align 16
+bin_crond_start:
+    .incbin "build/bin/crond"
+bin_crond_end:
+
+.align 16
+bin_crontab_start:
+    .incbin "build/bin/crontab"
+bin_crontab_end:
+
+.align 16
+bin_sshd_start:
+    .incbin "build/bin/sshd"
+bin_sshd_end:
+
+.align 16
+bin_telinit_start:
+    .incbin "build/bin/telinit"
+bin_telinit_end:
+
+.align 16
+bin_touch_start:
+    .incbin "build/bin/touch"
+bin_touch_end:
+
+.align 16
+bin_echo_start:
+    .incbin "build/bin/echo"
+bin_echo_end:
+
+.align 16
+bin_test_m16_start:
+    .incbin "build/bin/test_m16"
+bin_test_m16_end:
 

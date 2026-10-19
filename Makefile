@@ -91,7 +91,8 @@ C_SRCS  := kernel/main.c \
            kernel/drivers/net/e1000.c \
            kernel/net/m13_test.c \
            kernel/net/m14_test.c \
-           kernel/proc/m15_test.c
+           kernel/proc/m15_test.c \
+           kernel/proc/m16_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -139,7 +140,16 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/id \
               $(BUILD_DIR)/bin/su \
               $(BUILD_DIR)/bin/chmod \
-              $(BUILD_DIR)/bin/test_m15
+              $(BUILD_DIR)/bin/test_m15 \
+              $(BUILD_DIR)/bin/syslogd \
+              $(BUILD_DIR)/bin/logger \
+              $(BUILD_DIR)/bin/crond \
+              $(BUILD_DIR)/bin/crontab \
+              $(BUILD_DIR)/bin/sshd \
+              $(BUILD_DIR)/bin/telinit \
+              $(BUILD_DIR)/bin/touch \
+              $(BUILD_DIR)/bin/echo \
+              $(BUILD_DIR)/bin/test_m16
 
 .PHONY: all kernel run run-term debug test clean
 
@@ -189,7 +199,7 @@ run: $(TARGET_BIN) $(DISK_IMG)
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
-		-netdev user,id=net0 -device e1000,netdev=net0 \
+		-netdev user,id=net0,hostfwd=tcp::2222-:22 -device e1000,netdev=net0 \
 		-serial mon:stdio \
 		-vga std \
 		-no-reboot -no-shutdown
@@ -200,7 +210,7 @@ run-term: $(TARGET_BIN) $(DISK_IMG)
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
-		-netdev user,id=net0 -device e1000,netdev=net0 \
+		-netdev user,id=net0,hostfwd=tcp::2222-:22 -device e1000,netdev=net0 \
 		-nographic \
 		-serial mon:stdio \
 		-no-reboot -no-shutdown
@@ -228,13 +238,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M15 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M16 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M15 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M16 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M15 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M16 verification failed! <<<"; \
 		exit 1; \
 	fi
 

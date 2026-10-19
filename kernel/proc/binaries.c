@@ -31,6 +31,15 @@ extern char bin_id_start[],       bin_id_end[];
 extern char bin_su_start[],       bin_su_end[];
 extern char bin_chmod_start[],    bin_chmod_end[];
 extern char bin_test_m15_start[], bin_test_m15_end[];
+extern char bin_syslogd_start[],  bin_syslogd_end[];
+extern char bin_logger_start[],   bin_logger_end[];
+extern char bin_crond_start[],    bin_crond_end[];
+extern char bin_crontab_start[],  bin_crontab_end[];
+extern char bin_sshd_start[],     bin_sshd_end[];
+extern char bin_telinit_start[],  bin_telinit_end[];
+extern char bin_touch_start[],    bin_touch_end[];
+extern char bin_echo_start[],     bin_echo_end[];
+extern char bin_test_m16_start[], bin_test_m16_end[];
 
 struct binary_entry {
     const char *path;
@@ -78,6 +87,23 @@ static const struct binary_entry builtin_table[] = {
     { "/usr/bin/su",   bin_su_start,       bin_su_end,       04755, 0, 0 },
     { "/bin/chmod",    bin_chmod_start,    bin_chmod_end,    0755,  0, 0 },
     { "/bin/test_m15", bin_test_m15_start, bin_test_m15_end, 0755,  0, 0 },
+    { "/bin/syslogd",  bin_syslogd_start,  bin_syslogd_end,  0755,  0, 0 },
+    { "/sbin/syslogd", bin_syslogd_start,  bin_syslogd_end,  0755,  0, 0 },
+    { "/bin/logger",   bin_logger_start,   bin_logger_end,   0755,  0, 0 },
+    { "/usr/bin/logger", bin_logger_start, bin_logger_end,   0755,  0, 0 },
+    { "/bin/crond",    bin_crond_start,    bin_crond_end,    0755,  0, 0 },
+    { "/sbin/crond",   bin_crond_start,    bin_crond_end,    0755,  0, 0 },
+    { "/bin/crontab",  bin_crontab_start,  bin_crontab_end,  0755,  0, 0 },
+    { "/usr/bin/crontab", bin_crontab_start, bin_crontab_end, 0755, 0, 0 },
+    { "/bin/sshd",     bin_sshd_start,     bin_sshd_end,     0755,  0, 0 },
+    { "/sbin/sshd",    bin_sshd_start,     bin_sshd_end,     0755,  0, 0 },
+    { "/bin/telinit",  bin_telinit_start,  bin_telinit_end,  0755,  0, 0 },
+    { "/sbin/telinit", bin_telinit_start,  bin_telinit_end,  0755,  0, 0 },
+    { "/bin/touch",    bin_touch_start,    bin_touch_end,    0755,  0, 0 },
+    { "/usr/bin/touch",bin_touch_start,    bin_touch_end,    0755,  0, 0 },
+    { "/bin/echo",     bin_echo_start,     bin_echo_end,     0755,  0, 0 },
+    { "/usr/bin/echo", bin_echo_start,     bin_echo_end,     0755,  0, 0 },
+    { "/bin/test_m16", bin_test_m16_start, bin_test_m16_end, 0755,  0, 0 },
     { NULL, NULL, NULL, 0, 0, 0 }
 };
 

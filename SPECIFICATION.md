@@ -1093,7 +1093,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M13** | Сеть: `eth` → `arp` → `ipv4` → `icmp`/`udp`/`tcp`, sockets, `lo`, `e1000`, `virtio-net` | `ping 10.0.2.2` получает ответы; TCP-соединение устанавливается | `[x]` |
 | **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[x]` |
 | **M15** | Безопасность: `passwd/shadow/group`, `su`, `login`, `umask`, `setuid`, NX, stack canaries | Вход по паролю; `su aurora` меняет UID; canary ловит переполнение | `[x]` |
-| **M16** | Службы: `syslogd`, `crond`, `networking`, `sshd`, `init.d`, уровни | `sshd` принимает подключение с хоста; `crond` запускает задачу | `[ ]` |
+| **M16** | Службы: `syslogd`, `crond`, `networking`, `sshd`, `init.d`, уровни | `sshd` принимает подключение с хоста; `crond` запускает задачу | `[x]` |
 | **M17** | `pkg` + подпись + `/var/lib/pkg`, `man`-страницы для всех команд | `pkg install X` ставит и `man X` работает | `[ ]` |
 | **M18** | Тесты (unit/integration/posix), документация, `dmesg`, стабильность 24 ч | Прогон `make test` — 100 % зелёных; аптайм 24 ч без паники | `[ ]` |
 
@@ -1128,14 +1128,14 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 - [x] `ifconfig eth0` поднят по DHCP; `ping -c 3 10.0.2.2` — 0 % потерь.
 - [ ] TCP: установка, передача 100 МБ без ошибок, корректный `FIN`/`TIME_WAIT`.
 - [x] `wget` скачивает файл и он побайтно совпадает с оригиналом.
-- [ ] `ssh` с хоста: аутентификация по паролю, **pty выделен**, `Ctrl-C` работает в удалённой сессии.
+- [x] `ssh` с хоста: аутентификация по паролю, **pty выделен**, `Ctrl-C` работает в удалённой сессии.
 - [x] `netstat -an` показывает сокеты в правильных состояниях.
 
 ### 19.5 Оболочка и утилиты
 - [ ] Все утилиты из 11.4 присутствуют, имеют `man`-страницу, возвращают корректные коды.
 - [ ] `sh -c 'cat /etc/passwd | grep root | wc -l'` → `1`.
 - [ ] `vi` полностью функционален в raw-режиме: создание, редактирование, сохранение.
-- [ ] Скрипт `/etc/init.d/` исполняется оболочкой без ошибок.
+- [x] Скрипт `/etc/init.d/` исполняется оболочкой без ошибок.
 
 ### 19.6 Безопасность
 - [x] Вход без пароля невозможен; 3 неудачные попытки → задержка.
@@ -1147,7 +1147,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 ### 19.7 Пакеты и службы
 - [ ] `pkg install` / `remove` / `upgrade-system` — атомарно, с проверкой подписи.
 - [ ] Подделанный пакет отклоняется с `EACCES`/ошибкой подписи.
-- [ ] `syslogd` пишет в `/var/log/messages`; `crond` выполняет задачу по расписанию; всё стартует автоматически.
+- [x] `syslogd` пишет в `/var/log/messages`; `crond` выполняет задачу по расписанию; всё стартует автоматически.
 
 ### 19.8 Стабильность
 - [ ] Непрерывная работа **24 часа** под нагрузкой (fork-шторм + I/O + сеть) без паники и утечек памяти.
@@ -1355,7 +1355,7 @@ reboot: System halted
 [x] M13 eth/arp/ipv4/icmp/udp/tcp + sockets + e1000/virtio
 [x] M14 DHCP, DNS, ifconfig, netstat, wget, pty
 [x] M15 passwd/shadow/group, su, login, umask, setuid, NX, canaries
-[ ] M16 syslogd, crond, networking, sshd, init.d, runlevels
+[x] M16 syslogd, crond, networking, sshd, init.d, runlevels
 [ ] M17 pkg + подписи + man-страницы
 [ ] M18 тесты, документация, 24h стабильность
 ```

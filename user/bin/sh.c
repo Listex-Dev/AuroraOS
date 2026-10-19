@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <dirent.h>
 #include <signal.h>
 #include <errno.h>
 
@@ -44,6 +45,8 @@ static int g_last_exit_status = 0;
 static pid_t g_last_bg_pid = 0;
 static pid_t g_shell_pgid = 0;
 static int g_interactive = 0;
+static int g_script_argc = 0;
+static char **g_script_argv = NULL;
 
 #define MAX_HISTORY 64
 static char g_history[MAX_HISTORY][MAX_LINE];
@@ -148,9 +151,75 @@ static char *expand_variables(const char *in)
                 for (size_t b = 0; buf[b]; b++) out[o++] = buf[b];
                 i++;
             } else if (in[i] == '0') {
-                const char *s = "sh";
+                const char *s = (g_script_argv && g_script_argc > 0) ? g_script_argv[0] : "sh";
                 while (*s) out[o++] = *s++;
                 i++;
+            } else if (in[i] >= '1' && in[i] <= '9') {
+                int idx = in[i] - '0';
+                if (g_script_argv && idx < g_script_argc) {
+                    const char *val = g_script_argv[idx];
+                    while (*val) out[o++] = *val++;
+                }
+                i++;
+            } else if (in[i] == '#') {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%d", (g_script_argc > 1) ? (g_script_argc - 1) : 0);
+                for (size_t b = 0; buf[b]; b++) out[o++] = buf[b];
+                i++;
+            } else if (in[i] == '*' || in[i] == '@') {
+                if (g_script_argv) {
+                    for (int k = 1; k < g_script_argc; k++) {
+                        const char *val = g_script_argv[k];
+                        while (*val) out[o++] = *val++;
+                        if (k < g_script_argc - 1) out[o++] = ' ';
+                    }
+                }
+            } else if (in[i] == '(') {
+                i++;
+                char cmd[256];
+                size_t c = 0;
+                int depth = 1;
+                while (in[i] && c < sizeof(cmd) - 1) {
+                    if (in[i] == '(') depth++;
+                    else if (in[i] == ')') {
+                        depth--;
+                        if (depth == 0) break;
+                    }
+                    cmd[c++] = in[i++];
+                }
+                cmd[c] = '\0';
+                if (in[i] == ')') i++;
+
+                int pfd[2];
+                if (pipe(pfd) == 0) {
+                    pid_t pid = fork();
+                    if (pid == 0) {
+                        close(pfd[0]);
+                        dup2(pfd[1], STDOUT_FILENO);
+                        close(pfd[1]);
+                        int devnull = open("/dev/null", O_RDONLY);
+                        if (devnull >= 0) {
+                            dup2(devnull, STDIN_FILENO);
+                            close(devnull);
+                        }
+                        char *sh_argv[] = { "/bin/sh", "-c", cmd, NULL };
+                        execve("/bin/sh", sh_argv, environ);
+                        _exit(1);
+                    }
+                    close(pfd[1]);
+                    char res_buf[512];
+                    ssize_t n = read(pfd[0], res_buf, sizeof(res_buf) - 1);
+                    close(pfd[0]);
+                    waitpid(pid, NULL, 0);
+                    if (n > 0) {
+                        while (n > 0 && (res_buf[n - 1] == '\n' || res_buf[n - 1] == '\r' || res_buf[n - 1] == ' ')) {
+                            n--;
+                        }
+                        for (ssize_t k = 0; k < n; k++) {
+                            out[o++] = res_buf[k];
+                        }
+                    }
+                }
             } else if (in[i] == '{') {
                 i++;
                 char var[128];
@@ -319,6 +388,19 @@ static int builtin_unset(int argc, char **argv)
     return 0;
 }
 
+static int builtin_read(int argc, char **argv)
+{
+    if (argc < 2) return 1;
+    char line[512];
+    if (!fgets(line, sizeof(line), stdin)) return 1;
+    size_t l = strlen(line);
+    while (l > 0 && (line[l - 1] == '\n' || line[l - 1] == '\r')) {
+        line[--l] = '\0';
+    }
+    setenv(argv[1], line, 1);
+    return 0;
+}
+
 static int builtin_test(int argc, char **argv)
 {
     if (argc <= 1) return 1;
@@ -447,8 +529,12 @@ static int builtin_kill(int argc, char **argv)
     int sig = SIGTERM;
     int pid_arg = 1;
     if (argv[1][0] == '-') {
-        sig = atoi(&argv[1][1]);
-        if (sig <= 0) sig = SIGTERM;
+        if (strcmp(&argv[1][1], "0") == 0) {
+            sig = 0;
+        } else {
+            sig = atoi(&argv[1][1]);
+            if (sig <= 0) sig = SIGTERM;
+        }
         pid_arg = 2;
     }
     if (pid_arg >= argc) return 1;
@@ -458,6 +544,74 @@ static int builtin_kill(int argc, char **argv)
         return 1;
     }
     return 0;
+}
+
+static int builtin_killall(int argc, char **argv)
+{
+    if (argc < 2) {
+        fprintf(stderr, "sh: killall: usage: killall [-sig] name\n");
+        return 1;
+    }
+    int sig = SIGTERM;
+    int name_arg = 1;
+    if (argv[1][0] == '-') {
+        if (strcmp(&argv[1][1], "9") == 0) sig = SIGKILL;
+        else sig = atoi(&argv[1][1]);
+        if (sig <= 0) sig = SIGTERM;
+        name_arg = 2;
+    }
+    if (name_arg >= argc) return 1;
+    const char *target = argv[name_arg];
+
+    DIR *d = opendir("/proc");
+    if (!d) return 1;
+    struct dirent *ent;
+    int count = 0;
+    while ((ent = readdir(d)) != NULL) {
+        if (ent->d_name[0] >= '0' && ent->d_name[0] <= '9') {
+            pid_t pid = atoi(ent->d_name);
+            if (pid <= 1 || pid == getpid()) continue;
+            char path[256];
+            snprintf(path, sizeof(path), "/proc/%s/status", ent->d_name);
+            FILE *f = fopen(path, "r");
+            if (f) {
+                char line[128];
+                while (fgets(line, sizeof(line), f)) {
+                    if (strncmp(line, "Name:", 5) == 0) {
+                        char *p = line + 5;
+                        while (*p == ' ' || *p == '\t') p++;
+                        size_t l = strlen(p);
+                        while (l > 0 && (p[l - 1] == '\n' || p[l - 1] == '\r')) p[--l] = '\0';
+                        if (strcmp(p, target) == 0) {
+                            kill(pid, sig);
+                            count++;
+                        }
+                        break;
+                    }
+                }
+                fclose(f);
+            }
+        }
+    }
+    closedir(d);
+    return count > 0 ? 0 : 1;
+}
+
+static int builtin_rm(int argc, char **argv)
+{
+    if (argc < 2) return 1;
+    int force = 0;
+    int status = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "-rf") == 0) {
+            force = 1;
+            continue;
+        }
+        if (unlink(argv[i]) != 0) {
+            if (!force) status = 1;
+        }
+    }
+    return status;
 }
 
 static int builtin_type(int argc, char **argv)
@@ -541,6 +695,14 @@ static int check_builtin(int argc, char **argv, int *ret)
         *ret = builtin_kill(argc, argv);
         return 1;
     }
+    if (strcmp(argv[0], "killall") == 0) {
+        *ret = builtin_killall(argc, argv);
+        return 1;
+    }
+    if (strcmp(argv[0], "rm") == 0) {
+        *ret = builtin_rm(argc, argv);
+        return 1;
+    }
     if (strcmp(argv[0], "type") == 0 || strcmp(argv[0], "which") == 0) {
         *ret = builtin_type(argc, argv);
         return 1;
@@ -558,6 +720,10 @@ static int check_builtin(int argc, char **argv, int *ret)
         *ret = 0;
         return 1;
     }
+    if (strcmp(argv[0], "read") == 0) {
+        *ret = builtin_read(argc, argv);
+        return 1;
+    }
     if (strcmp(argv[0], "exit") == 0) {
         int code = (argc > 1) ? atoi(argv[1]) : g_last_exit_status;
         exit(code);
@@ -572,11 +738,12 @@ static int check_builtin(int argc, char **argv, int *ret)
 }
 
 /* Parse redirections out of an argument list */
-static int extract_redirections(char **argv, char **in_file, char **out_file, int *append, int *err_to_out)
+static int extract_redirections(char **argv, char **in_file, char **out_file, int *append, char **err_file, int *err_to_out)
 {
     *in_file = NULL;
     *out_file = NULL;
     *append = 0;
+    *err_file = NULL;
     *err_to_out = 0;
 
     int r = 0;
@@ -586,20 +753,35 @@ static int extract_redirections(char **argv, char **in_file, char **out_file, in
                 *in_file = argv[i + 1];
                 i++;
             }
-        } else if (strcmp(argv[i], ">") == 0) {
-            if (argv[i + 1]) {
-                *out_file = argv[i + 1];
-                *append = 0;
-                i++;
-            }
+        } else if (strncmp(argv[i], "<", 1) == 0 && argv[i][1] != '\0') {
+            *in_file = &argv[i][1];
         } else if (strcmp(argv[i], ">>") == 0) {
             if (argv[i + 1]) {
                 *out_file = argv[i + 1];
                 *append = 1;
                 i++;
             }
+        } else if (strncmp(argv[i], ">>", 2) == 0 && argv[i][2] != '\0') {
+            *out_file = &argv[i][2];
+            *append = 1;
         } else if (strcmp(argv[i], "2>&1") == 0) {
             *err_to_out = 1;
+        } else if (strncmp(argv[i], "2>", 2) == 0) {
+            if (argv[i][2] != '\0') {
+                *err_file = &argv[i][2];
+            } else if (argv[i + 1]) {
+                *err_file = argv[i + 1];
+                i++;
+            }
+        } else if (strcmp(argv[i], ">") == 0) {
+            if (argv[i + 1]) {
+                *out_file = argv[i + 1];
+                *append = 0;
+                i++;
+            }
+        } else if (strncmp(argv[i], ">", 1) == 0 && argv[i][1] != '\0') {
+            *out_file = &argv[i][1];
+            *append = 0;
         } else {
             argv[r++] = argv[i];
         }
@@ -617,14 +799,25 @@ static int execute_command(char *cmd_str, int in_fd, int out_fd, pid_t *child_pi
 
     char *in_file = NULL;
     char *out_file = NULL;
+    char *err_file = NULL;
     int append = 0;
     int err_to_out = 0;
-    argc = extract_redirections(argv, &in_file, &out_file, &append, &err_to_out);
+    argc = extract_redirections(argv, &in_file, &out_file, &append, &err_file, &err_to_out);
 
     if (argc == 0 || argv[0] == NULL) return 0;
 
+    /* Check for standalone variable assignment: VAR=val */
+    if (argc == 1 && strchr(argv[0], '=') != NULL && argv[0][0] != '=') {
+        char *eq = strchr(argv[0], '=');
+        *eq = '\0';
+        setenv(argv[0], eq + 1, 1);
+        *eq = '=';
+        if (child_pid) *child_pid = 0;
+        return 0;
+    }
+
     /* Check if builtin should be run in current process (only if not background and not in a pipe/redirection) */
-    if (!is_bg && in_fd == STDIN_FILENO && out_fd == STDOUT_FILENO && !in_file && !out_file) {
+    if (!is_bg && in_fd == STDIN_FILENO && out_fd == STDOUT_FILENO && !in_file && !out_file && !err_file && !err_to_out) {
         int ret = 0;
         if (check_builtin(argc, argv, &ret)) {
             g_last_exit_status = ret;
@@ -677,6 +870,15 @@ static int execute_command(char *cmd_str, int in_fd, int out_fd, pid_t *child_pi
             dup2(fd, STDOUT_FILENO);
             close(fd);
         }
+        if (err_file) {
+            int fd = open(err_file, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+            if (fd < 0) {
+                fprintf(stderr, "sh: %s: %s\n", err_file, strerror(errno));
+                _exit(1);
+            }
+            dup2(fd, STDERR_FILENO);
+            close(fd);
+        }
         if (err_to_out) {
             dup2(STDOUT_FILENO, STDERR_FILENO);
         }
@@ -707,10 +909,19 @@ static int execute_pipeline(char *pipe_str, int is_bg)
     int num_cmds = 0;
 
     char *p = pipe_str;
+    char in_q = 0;
     while (*p) {
         while (*p == ' ') p++;
         char *start = p;
-        while (*p && *p != '|') p++;
+        while (*p) {
+            if (*p == '\'' || *p == '"') {
+                if (!in_q) in_q = *p;
+                else if (in_q == *p) in_q = 0;
+            } else if (!in_q && *p == '|') {
+                break;
+            }
+            p++;
+        }
         if (*p == '|') {
             *p = '\0';
             cmds[num_cmds++] = start;
@@ -806,10 +1017,14 @@ static int execute_line(char *line)
                     sep_type = 3;
                     break;
                 } else if (*p == '&') {
-                    *p = '\0';
-                    p++;
-                    sep_type = 4;
-                    break;
+                    if (p > cmd_start && (*(p - 1) == '>' || *(p - 1) == '<')) {
+                        /* Part of redirection >& or <& */
+                    } else {
+                        *p = '\0';
+                        p++;
+                        sep_type = 4;
+                        break;
+                    }
                 }
             }
             p++;
@@ -837,7 +1052,13 @@ static int execute_line(char *line)
                         if (*p == ';') { *p = '\0'; p++; skip_sep = 1; break; }
                         if (*p == '&' && p[1] == '&') { *p = '\0'; p += 2; break; }
                         if (*p == '|' && p[1] == '|') { *p = '\0'; p += 2; skip_sep = 3; break; }
-                        if (*p == '&') { *p = '\0'; p++; skip_sep = 4; break; }
+                        if (*p == '&') {
+                            if (p > cmd_start && (*(p - 1) == '>' || *(p - 1) == '<')) {
+                                /* Part of redirection */
+                            } else {
+                                *p = '\0'; p++; skip_sep = 4; break;
+                            }
+                        }
                     }
                     p++;
                 }
@@ -861,7 +1082,13 @@ static int execute_line(char *line)
                         if (*p == ';') { *p = '\0'; p++; skip_sep = 1; break; }
                         if (*p == '|' && p[1] == '|') { *p = '\0'; p += 2; break; }
                         if (*p == '&' && p[1] == '&') { *p = '\0'; p += 2; skip_sep = 2; break; }
-                        if (*p == '&') { *p = '\0'; p++; skip_sep = 4; break; }
+                        if (*p == '&') {
+                            if (p > cmd_start && (*(p - 1) == '>' || *(p - 1) == '<')) {
+                                /* Part of redirection */
+                            } else {
+                                *p = '\0'; p++; skip_sep = 4; break;
+                            }
+                        }
                     }
                     p++;
                 }
@@ -1170,6 +1397,8 @@ int main(int argc, char **argv)
 
     /* Check for script file argument */
     if (argc >= 2 && argv[1][0] != '-') {
+        g_script_argc = argc - 1;
+        g_script_argv = &argv[1];
         FILE *f = fopen(argv[1], "r");
         if (!f) {
             fprintf(stderr, "sh: %s: %s\n", argv[1], strerror(errno));
