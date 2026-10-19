@@ -231,18 +231,24 @@ int main(int argc, char **argv)
 
     log_cron("root", "(CRON) STARTUP (AuroraOS Cron Daemon)");
 
+    int last_min = -1;
     while (g_running) {
         /* Check and reap any zombie children */
         int status;
         while (waitpid(-1, &status, WNOHANG) > 0) {
         }
 
-        process_crontabs(test_mode);
-
+        time_t now = time(NULL);
+        struct tm *tm = localtime(&now);
         if (test_mode) {
+            process_crontabs(1);
             sleep(1);
         } else {
-            sleep(10);
+            if (tm && tm->tm_min != last_min) {
+                last_min = tm->tm_min;
+                process_crontabs(0);
+            }
+            sleep(1);
         }
     }
 

@@ -210,10 +210,12 @@ struct socket *tcp_accept(struct socket *sock)
     for (int iter = 0; iter < 1000; iter++) {
         if (sock->accept_count > 0) {
             struct socket *child = sock->accept_queue[sock->accept_tail];
-            sock->accept_queue[sock->accept_tail] = NULL;
-            sock->accept_tail = (sock->accept_tail + 1) % 16;
-            sock->accept_count--;
-            return child;
+            if (child && child->state == TCP_ESTABLISHED) {
+                sock->accept_queue[sock->accept_tail] = NULL;
+                sock->accept_tail = (sock->accept_tail + 1) % 16;
+                sock->accept_count--;
+                return child;
+            }
         }
 
         if (dev && dev->ops && dev->ops->poll) {
@@ -228,7 +230,19 @@ struct socket *tcp_accept(struct socket *sock)
 
 int tcp_send(struct socket *sock, const void *buf, size_t len)
 {
-    if (!sock || sock->state != TCP_ESTABLISHED) {
+    if (!sock) {
+        return -1;
+    }
+
+    struct netdev *dev = netdev_get_default();
+    for (int iter = 0; iter < 1000 && sock->state == TCP_SYN_RECEIVED; iter++) {
+        if (dev && dev->ops && dev->ops->poll) {
+            dev->ops->poll(dev);
+        }
+        for (volatile int d = 0; d < 1000; d++);
+    }
+
+    if (sock->state != TCP_ESTABLISHED) {
         return -1;
     }
 
@@ -330,6 +344,13 @@ int tcp_receive(struct netdev *dev, uint32_t src_ip, uint32_t dst_ip, netbuf_t *
         } else if (matched->state == TCP_SYN_RECEIVED) {
             if (flags & TCP_FLAG_ACK) {
                 matched->state = TCP_ESTABLISHED;
+                size_t payload_len = nb->len > hdr_len ? nb->len - hdr_len : 0;
+                if (payload_len > 0) {
+                    uint8_t *payload = nb->data + hdr_len;
+                    socket_enqueue_rx(matched, payload, payload_len);
+                    matched->rcv_nxt = seq + (uint32_t)payload_len;
+                    tcp_send_packet(matched, TCP_FLAG_ACK, NULL, 0);
+                }
             }
         } else if (matched->state == TCP_ESTABLISHED) {
             size_t payload_len = nb->len > hdr_len ? nb->len - hdr_len : 0;

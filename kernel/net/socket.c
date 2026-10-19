@@ -123,7 +123,7 @@ static ssize_t socket_vfs_read(struct file *file, void *buf, size_t count, uint6
     struct netdev *dev = netdev_get_default();
 
     if (sock->type == SOCK_STREAM) {
-        while (sock->rx_count == 0 && sock->state == TCP_ESTABLISHED) {
+        while (sock->rx_count == 0 && (sock->state == TCP_ESTABLISHED || sock->state == TCP_SYN_RECEIVED)) {
             if (file->f_flags & O_NONBLOCK) {
                 return -EAGAIN;
             }
@@ -194,6 +194,10 @@ static int socket_vfs_ioctl(struct file *file, unsigned int cmd, unsigned long a
     if (cmd == FIONREAD) {
         if (!arg) {
             return -EFAULT;
+        }
+        struct netdev *dev = netdev_get_default();
+        if (dev && dev->ops && dev->ops->poll) {
+            dev->ops->poll(dev);
         }
         *(int *)arg = (int)sock->rx_count;
         return 0;

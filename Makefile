@@ -151,7 +151,7 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/echo \
               $(BUILD_DIR)/bin/test_m16
 
-.PHONY: all kernel run run-term debug test clean
+.PHONY: all kernel run run-term debug test clean ssh
 
 all: kernel
 
@@ -214,6 +214,13 @@ run-term: $(TARGET_BIN) $(DISK_IMG)
 		-nographic \
 		-serial mon:stdio \
 		-no-reboot -no-shutdown
+
+tools/aurora-ssh: tools/aurora-ssh.c
+	@mkdir -p tools
+	@gcc -O2 tools/aurora-ssh.c -o tools/aurora-ssh
+
+ssh: tools/aurora-ssh
+	@./tools/aurora-ssh
 
 debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 	@echo "Starting AuroraOS in debug mode (GDB port :1234)..."

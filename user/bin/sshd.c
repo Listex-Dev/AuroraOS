@@ -85,7 +85,7 @@ static void log_auth(const char *fmt, ...)
     }
 }
 
-static ssize_t read_line(int fd, char *buf, size_t max_len)
+static ssize_t read_line(int fd, char *buf, size_t max_len, int do_echo)
 {
     size_t pos = 0;
     while (pos < max_len - 1) {
@@ -95,9 +95,30 @@ static ssize_t read_line(int fd, char *buf, size_t max_len)
             if (pos == 0) return -1;
             break;
         }
-        if (c == '\r') continue;
-        if (c == '\n') break;
+        if (c == '\r') {
+            int avail = 0;
+            if (ioctl(fd, FIONREAD, &avail) == 0 && avail > 0) {
+                char next_c;
+                read(fd, &next_c, 1);
+            }
+            write(fd, "\r\n", 2);
+            break;
+        }
+        if (c == '\n') {
+            write(fd, "\r\n", 2);
+            break;
+        }
+        if (c == '\b' || (unsigned char)c == 0x7F) {
+            if (pos > 0) {
+                pos--;
+                if (do_echo) write(fd, "\b \b", 3);
+            }
+            continue;
+        }
         buf[pos++] = c;
+        if (do_echo) {
+            write(fd, &c, 1);
+        }
     }
     buf[pos] = '\0';
     return (ssize_t)pos;
@@ -120,7 +141,7 @@ static void handle_client(int client_fd, struct sockaddr_in *client_addr)
     write(client_fd, prompt_user, strlen(prompt_user));
 
     char username[64];
-    if (read_line(client_fd, username, sizeof(username)) <= 0) {
+    if (read_line(client_fd, username, sizeof(username), 1) <= 0) {
         close(client_fd);
         _exit(1);
     }
@@ -129,7 +150,7 @@ static void handle_client(int client_fd, struct sockaddr_in *client_addr)
     write(client_fd, prompt_pass, strlen(prompt_pass));
 
     char password[64];
-    if (read_line(client_fd, password, sizeof(password)) < 0) {
+    if (read_line(client_fd, password, sizeof(password), 0) < 0) {
         close(client_fd);
         _exit(1);
     }
