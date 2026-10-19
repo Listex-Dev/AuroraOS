@@ -19,5 +19,6 @@ int udp_receive(struct netdev *dev, uint32_t src_ip, uint32_t dst_ip, netbuf_t *
 int udp_send(struct socket *sock, uint32_t dst_ip, uint16_t dst_port, const void *buf, size_t len);
 int udp_bind(struct socket *sock, uint16_t port);
 void udp_unbind(struct socket *sock);
+struct socket *udp_get_socket_list(void);
 
 #endif /* _AURORA_NET_UDP_H */

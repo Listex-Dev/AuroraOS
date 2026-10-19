@@ -98,6 +98,8 @@ struct winsize {
 #define TIOCSCTTY   0x540E
 #define TIOCNOTTY   0x5422
 #define FIONREAD    0x541B
+#define TIOCGPTN    0x80045430
+#define TIOCSPTLCK  0x40045431
 
 /* Virtual Terminal ioctl commands */
 #define VT_OPENQRY   0x5600

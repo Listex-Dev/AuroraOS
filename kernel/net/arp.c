@@ -61,6 +61,12 @@ int arp_lookup(struct netdev *dev, uint32_t ip, uint8_t *mac_out)
         return -1;
     }
 
+    /* Broadcast address 255.255.255.255 maps to FF:FF:FF:FF:FF:FF */
+    if (ip == 0xFFFFFFFF || ip == net_htonl(0xFFFFFFFF)) {
+        memset(mac_out, 0xFF, ETH_ALEN);
+        return 0;
+    }
+
     /* Check local cache */
     for (int i = 0; i < ARP_TABLE_SIZE; i++) {
         if (s_arp_table[i].valid && s_arp_table[i].ip == ip) {

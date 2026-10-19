@@ -23,6 +23,12 @@
 .global bin_test_m12_start, bin_test_m12_end
 .global bin_ping_start, bin_ping_end
 .global bin_test_m13_start, bin_test_m13_end
+.global bin_dhclient_start, bin_dhclient_end
+.global bin_nslookup_start, bin_nslookup_end
+.global bin_ifconfig_start, bin_ifconfig_end
+.global bin_netstat_start, bin_netstat_end
+.global bin_wget_start, bin_wget_end
+.global bin_test_m14_start, bin_test_m14_end
 
 .align 16
 bin_hello_start:
@@ -123,3 +129,34 @@ bin_ping_end:
 bin_test_m13_start:
     .incbin "build/bin/test_m13"
 bin_test_m13_end:
+
+.align 16
+bin_dhclient_start:
+    .incbin "build/bin/dhclient"
+bin_dhclient_end:
+
+.align 16
+bin_nslookup_start:
+    .incbin "build/bin/nslookup"
+bin_nslookup_end:
+
+.align 16
+bin_ifconfig_start:
+    .incbin "build/bin/ifconfig"
+bin_ifconfig_end:
+
+.align 16
+bin_netstat_start:
+    .incbin "build/bin/netstat"
+bin_netstat_end:
+
+.align 16
+bin_wget_start:
+    .incbin "build/bin/wget"
+bin_wget_end:
+
+.align 16
+bin_test_m14_start:
+    .incbin "build/bin/test_m14"
+bin_test_m14_end:
+

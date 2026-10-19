@@ -50,5 +50,6 @@ struct socket *tcp_accept(struct socket *sock);
 int tcp_send(struct socket *sock, const void *buf, size_t len);
 int tcp_close(struct socket *sock);
 void tcp_unbind(struct socket *sock);
+struct socket *tcp_get_socket_list(void);
 
 #endif /* _AURORA_NET_TCP_H */

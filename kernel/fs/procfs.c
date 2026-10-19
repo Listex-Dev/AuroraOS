@@ -11,6 +11,9 @@
 #include <aurora/drivers/block.h>
 #include <aurora/net/netdev.h>
 #include <aurora/net/arp.h>
+#include <aurora/net/socket.h>
+#include <aurora/net/tcp.h>
+#include <aurora/net/udp.h>
 
 struct proc_node {
     proc_read_fn generator;
@@ -253,14 +256,57 @@ static ssize_t gen_net_route(char *buf, size_t max_len)
 
 static ssize_t gen_net_tcp(char *buf, size_t max_len)
 {
-    return snprintf(buf, max_len,
+    size_t off = 0;
+    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
                     "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+
+    int slot = 0;
+    for (struct socket *s = tcp_get_socket_list(); s != NULL; s = s->next) {
+        int st_hex = 0x07;
+        switch (s->state) {
+            case TCP_LISTEN:        st_hex = 0x0A; break;
+            case TCP_ESTABLISHED:   st_hex = 0x01; break;
+            case TCP_SYN_SENT:      st_hex = 0x02; break;
+            case TCP_SYN_RECEIVED:  st_hex = 0x03; break;
+            case TCP_FIN_WAIT_1:    st_hex = 0x04; break;
+            case TCP_FIN_WAIT_2:    st_hex = 0x05; break;
+            case TCP_TIME_WAIT:     st_hex = 0x06; break;
+            case TCP_CLOSE_WAIT:    st_hex = 0x08; break;
+            case TCP_LAST_ACK:      st_hex = 0x09; break;
+            case TCP_CLOSING:       st_hex = 0x0B; break;
+            default:                st_hex = 0x07; break;
+        }
+
+        uint32_t lip = s->local_ip;
+        uint16_t lport = s->local_port;
+        uint32_t rip = s->remote_ip;
+        uint16_t rport = s->remote_port;
+
+        off += snprintf(buf + off, max_len > off ? max_len - off : 0,
+                        "%4d: %08X:%04X %08X:%04X %02X %08X:%08X 00:00000000 00000000     0        0 0 1 0000000000000000 100 0 0 10 0\n",
+                        slot++, lip, lport, rip, rport, st_hex, 0, s->rx_count);
+    }
+    return (ssize_t)off;
 }
 
 static ssize_t gen_net_udp(char *buf, size_t max_len)
 {
-    return snprintf(buf, max_len,
+    size_t off = 0;
+    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
                     "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+
+    int slot = 0;
+    for (struct socket *s = udp_get_socket_list(); s != NULL; s = s->next) {
+        uint32_t lip = s->local_ip;
+        uint16_t lport = s->local_port;
+        uint32_t rip = s->remote_ip;
+        uint16_t rport = s->remote_port;
+
+        off += snprintf(buf + off, max_len > off ? max_len - off : 0,
+                        "%4d: %08X:%04X %08X:%04X 07 %08X:%08X 00:00000000 00000000     0        0 0 2 0000000000000000 100 0 0 10 0\n",
+                        slot++, lip, lport, rip, rport, 0, s->rx_count);
+    }
+    return (ssize_t)off;
 }
 
 static void create_proc_file(struct super_block *sb, struct dentry *parent, const char *name, proc_read_fn fn)

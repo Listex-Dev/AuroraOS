@@ -492,3 +492,171 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream)
     (*lineptr)[pos] = '\0';
     return (ssize_t)pos;
 }
+
+int vsscanf(const char *str, const char *format, va_list ap)
+{
+    if (!str || !format) return 0;
+
+    const char *s = str;
+    const char *f = format;
+    int assigned = 0;
+
+    while (*f) {
+        if (*f == ' ' || *f == '\t' || *f == '\n' || *f == '\r') {
+            while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+            f++;
+            continue;
+        }
+
+        if (*f != '%') {
+            if (*s != *f) {
+                break;
+            }
+            s++;
+            f++;
+            continue;
+        }
+
+        f++; /* skip '%' */
+        int suppress = 0;
+        if (*f == '*') {
+            suppress = 1;
+            f++;
+        }
+
+        int width = 0;
+        while (*f >= '0' && *f <= '9') {
+            width = width * 10 + (*f - '0');
+            f++;
+        }
+
+        int length_mod = 0; /* 1 = l, 2 = ll */
+        if (*f == 'l') {
+            length_mod = 1;
+            f++;
+            if (*f == 'l') {
+                length_mod = 2;
+                f++;
+            }
+        }
+
+        char spec = *f++;
+        if (spec != 'c') {
+            while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+        }
+
+        if (!*s && spec != 'c') {
+            break;
+        }
+
+        if (spec == 'c') {
+            if (!*s) break;
+            if (!suppress) {
+                char *dst = va_arg(ap, char *);
+                *dst = *s;
+                assigned++;
+            }
+            s++;
+        } else if (spec == 's') {
+            char *dst = suppress ? NULL : va_arg(ap, char *);
+            int max_w = (width > 0) ? width : 1000000;
+            int count = 0;
+            while (*s && *s != ' ' && *s != '\t' && *s != '\n' && *s != '\r' && count < max_w) {
+                if (dst) dst[count] = *s;
+                count++;
+                s++;
+            }
+            if (dst && count > 0) {
+                dst[count] = '\0';
+                assigned++;
+            }
+        } else if (spec == 'd' || spec == 'i') {
+            int sign = 1;
+            if (*s == '-') { sign = -1; s++; }
+            else if (*s == '+') { s++; }
+            if (*s < '0' || *s > '9') break;
+            long long val = 0;
+            int count = 0;
+            int max_w = (width > 0) ? width : 1000000;
+            while (*s >= '0' && *s <= '9' && count < max_w) {
+                val = val * 10 + (*s - '0');
+                s++;
+                count++;
+            }
+            val *= sign;
+            if (!suppress) {
+                if (length_mod == 2) {
+                    *(long long *)va_arg(ap, long long *) = val;
+                } else if (length_mod == 1) {
+                    *(long *)va_arg(ap, long *) = (long)val;
+                } else {
+                    *(int *)va_arg(ap, int *) = (int)val;
+                }
+                assigned++;
+            }
+        } else if (spec == 'u') {
+            if (*s < '0' || *s > '9') break;
+            unsigned long long val = 0;
+            int count = 0;
+            int max_w = (width > 0) ? width : 1000000;
+            while (*s >= '0' && *s <= '9' && count < max_w) {
+                val = val * 10 + (*s - '0');
+                s++;
+                count++;
+            }
+            if (!suppress) {
+                if (length_mod == 2) {
+                    *(unsigned long long *)va_arg(ap, unsigned long long *) = val;
+                } else if (length_mod == 1) {
+                    *(unsigned long *)va_arg(ap, unsigned long *) = (unsigned long)val;
+                } else {
+                    *(unsigned int *)va_arg(ap, unsigned int *) = (unsigned int)val;
+                }
+                assigned++;
+            }
+        } else if (spec == 'x' || spec == 'X') {
+            if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) s += 2;
+            unsigned long long val = 0;
+            int count = 0;
+            int max_w = (width > 0) ? width : 1000000;
+            int has_digits = 0;
+            while (count < max_w) {
+                char c = *s;
+                int d = -1;
+                if (c >= '0' && c <= '9') d = c - '0';
+                else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
+                else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
+                else break;
+                val = (val << 4) | (unsigned long long)d;
+                s++;
+                count++;
+                has_digits = 1;
+            }
+            if (!has_digits) break;
+            if (!suppress) {
+                if (length_mod == 2) {
+                    *(unsigned long long *)va_arg(ap, unsigned long long *) = val;
+                } else if (length_mod == 1) {
+                    *(unsigned long *)va_arg(ap, unsigned long *) = (unsigned long)val;
+                } else {
+                    *(unsigned int *)va_arg(ap, unsigned int *) = (unsigned int)val;
+                }
+                assigned++;
+            }
+        } else {
+            break;
+        }
+    }
+
+    return assigned;
+}
+
+int sscanf(const char *str, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    int ret = vsscanf(str, format, ap);
+    va_end(ap);
+    return ret;
+}
+

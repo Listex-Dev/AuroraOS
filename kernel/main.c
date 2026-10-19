@@ -41,6 +41,8 @@
 #include <aurora/proc/m11_test.h>
 #include <aurora/drivers/m12_test.h>
 #include <aurora/net/m13_test.h>
+#include <aurora/net/m14_test.h>
+#include <aurora/net/dhcp.h>
 #include <aurora/net/netdev.h>
 #include <aurora/net/arp.h>
 #include <aurora/net/icmp.h>
@@ -242,6 +244,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
         test_m11_init_getty_login_shell();
         test_m12_block_and_pci_subsystem();
         test_m13_network_subsystem();
+        test_m14_services_and_pty_subsystem();
     } else {
         /* Interactive Production Boot: initialize drivers and start PID 1 */
         pci_init();
@@ -255,6 +258,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
         tcp_init();
         socket_subsys_init();
         e1000_init();
+        dhcp_configure_interface(NULL, NULL);
         tty_subsys_init();
         kbd_init();
 

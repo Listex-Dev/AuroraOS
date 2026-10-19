@@ -42,4 +42,14 @@ typedef _Bool              bool;
 #define NULL ((void *)0)
 #endif
 
+#ifndef offsetof
+#define offsetof(type, member) __builtin_offsetof(type, member)
+#endif
+
+#ifndef container_of
+#define container_of(ptr, type, member) ({                      \
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
+        (type *)( (char *)__mptr - offsetof(type,member) );})
+#endif
+
 #endif /* _AURORA_TYPES_H */

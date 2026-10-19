@@ -94,6 +94,24 @@ int socket_enqueue_rx(struct socket *sock, const void *data, size_t len)
     return (int)copied;
 }
 
+int socket_dequeue_rx(struct socket *sock, void *buf, size_t len)
+{
+    if (!sock || !buf || len == 0 || !sock->rx_buf || sock->rx_count == 0) {
+        return 0;
+    }
+
+    uint8_t *dst = (uint8_t *)buf;
+    size_t copied = 0;
+
+    while (copied < len && sock->rx_count > 0) {
+        dst[copied++] = sock->rx_buf[sock->rx_tail];
+        sock->rx_tail = (sock->rx_tail + 1) % SOCKET_BUFFER_SIZE;
+        sock->rx_count--;
+    }
+
+    return (int)copied;
+}
+
 static ssize_t socket_vfs_read(struct file *file, void *buf, size_t count, uint64_t *pos)
 {
     (void)pos;
@@ -104,19 +122,31 @@ static ssize_t socket_vfs_read(struct file *file, void *buf, size_t count, uint6
     struct socket *sock = (struct socket *)file->private_data;
     struct netdev *dev = netdev_get_default();
 
-    /* If buffer empty, poll network device */
-    for (int iter = 0; iter < 1000 && sock->rx_count == 0; iter++) {
-        if (dev && dev->ops && dev->ops->poll) {
-            dev->ops->poll(dev);
+    if (sock->type == SOCK_STREAM) {
+        while (sock->rx_count == 0 && sock->state == TCP_ESTABLISHED) {
+            if (file->f_flags & O_NONBLOCK) {
+                return -EAGAIN;
+            }
+            if (dev && dev->ops && dev->ops->poll) {
+                dev->ops->poll(dev);
+            }
+            sched_yield();
         }
-        if (sock->rx_count > 0) {
-            break;
+        if (sock->rx_count == 0) {
+            return 0; /* EOF */
         }
-        for (volatile int d = 0; d < 1000; d++);
-    }
-
-    if (sock->rx_count == 0) {
-        return 0;
+    } else {
+        for (int iter = 0; iter < 100 && sock->rx_count == 0; iter++) {
+            if (dev && dev->ops && dev->ops->poll) {
+                dev->ops->poll(dev);
+            }
+            if (sock->rx_count > 0) break;
+            sched_yield();
+        }
+        if (sock->rx_count == 0) {
+            if (file->f_flags & O_NONBLOCK) return -EAGAIN;
+            return 0;
+        }
     }
 
     uint8_t *dst = (uint8_t *)buf;
@@ -210,18 +240,27 @@ ssize_t socket_recv(struct socket *sock, void *buf, size_t len, int flags)
     }
 
     struct netdev *dev = netdev_get_default();
-    for (int iter = 0; iter < 1000 && sock->rx_count == 0; iter++) {
-        if (dev && dev->ops && dev->ops->poll) {
-            dev->ops->poll(dev);
+    if (sock->type == SOCK_STREAM) {
+        while (sock->rx_count == 0 && sock->state == TCP_ESTABLISHED) {
+            if (dev && dev->ops && dev->ops->poll) {
+                dev->ops->poll(dev);
+            }
+            sched_yield();
         }
-        if (sock->rx_count > 0) {
-            break;
+        if (sock->rx_count == 0) {
+            return 0; /* EOF */
         }
-        for (volatile int d = 0; d < 1000; d++);
-    }
-
-    if (sock->rx_count == 0) {
-        return 0;
+    } else {
+        for (int iter = 0; iter < 100 && sock->rx_count == 0; iter++) {
+            if (dev && dev->ops && dev->ops->poll) {
+                dev->ops->poll(dev);
+            }
+            if (sock->rx_count > 0) break;
+            sched_yield();
+        }
+        if (sock->rx_count == 0) {
+            return 0;
+        }
     }
 
     uint8_t *dst = (uint8_t *)buf;
@@ -360,10 +399,21 @@ int64_t sys_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sock->type != SOCK_STREAM) {
         return -EOPNOTSUPP;
     }
+    if (sock->state != TCP_LISTEN) {
+        return -EINVAL;
+    }
 
-    struct socket *child = tcp_accept(sock);
-    if (!child) {
-        return -EAGAIN;
+    struct socket *child = NULL;
+    struct netdev *dev = netdev_get_default();
+
+    while (!(child = tcp_accept(sock))) {
+        if (sock->file && (sock->file->f_flags & O_NONBLOCK)) {
+            return -EAGAIN;
+        }
+        if (dev && dev->ops && dev->ops->poll) {
+            dev->ops->poll(dev);
+        }
+        sched_yield();
     }
 
     struct file *file = (struct file *)kzalloc(sizeof(struct file), GFP_KERNEL);

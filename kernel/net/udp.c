@@ -124,3 +124,9 @@ int udp_receive(struct netdev *dev, uint32_t src_ip, uint32_t dst_ip, netbuf_t *
     netbuf_free(nb);
     return 0;
 }
+
+struct socket *udp_get_socket_list(void)
+{
+    return s_udp_sockets;
+}
+

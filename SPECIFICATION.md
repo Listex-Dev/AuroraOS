@@ -1091,7 +1091,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M11** | `/bin/sh` с конвейерами, редиректами, job control; `init` (PID 1) + `getty` + `login` | **Полный сценарий: power-on → `aurora login:` → `root` → shell** | `[x]` |
 | **M12** | Блочные устройства: `pci`, `ata/ahci`, `/dev/sda*`, `mknod`, `major/minor` | `fdisk -l`, `mount /dev/sda2 /mnt` работают | `[x]` |
 | **M13** | Сеть: `eth` → `arp` → `ipv4` → `icmp`/`udp`/`tcp`, sockets, `lo`, `e1000`, `virtio-net` | `ping 10.0.2.2` получает ответы; TCP-соединение устанавливается | `[x]` |
-| **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[ ]` |
+| **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[x]` |
 | **M15** | Безопасность: `passwd/shadow/group`, `su`, `login`, `umask`, `setuid`, NX, stack canaries | Вход по паролю; `su aurora` меняет UID; canary ловит переполнение | `[ ]` |
 | **M16** | Службы: `syslogd`, `crond`, `networking`, `sshd`, `init.d`, уровни | `sshd` принимает подключение с хоста; `crond` запускает задачу | `[ ]` |
 | **M17** | `pkg` + подпись + `/var/lib/pkg`, `man`-страницы для всех команд | `pkg install X` ставит и `man X` работает | `[ ]` |
@@ -1125,11 +1125,11 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 - [ ] `fsck` на повреждённой ФС находит и чинит ошибки.
 
 ### 19.4 Сеть
-- [ ] `ifconfig eth0` поднят по DHCP; `ping -c 3 10.0.2.2` — 0 % потерь.
+- [x] `ifconfig eth0` поднят по DHCP; `ping -c 3 10.0.2.2` — 0 % потерь.
 - [ ] TCP: установка, передача 100 МБ без ошибок, корректный `FIN`/`TIME_WAIT`.
-- [ ] `wget` скачивает файл и он побайтно совпадает с оригиналом.
+- [x] `wget` скачивает файл и он побайтно совпадает с оригиналом.
 - [ ] `ssh` с хоста: аутентификация по паролю, **pty выделен**, `Ctrl-C` работает в удалённой сессии.
-- [ ] `netstat -an` показывает сокеты в правильных состояниях.
+- [x] `netstat -an` показывает сокеты в правильных состояниях.
 
 ### 19.5 Оболочка и утилиты
 - [ ] Все утилиты из 11.4 присутствуют, имеют `man`-страницу, возвращают корректные коды.

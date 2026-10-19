@@ -1,4 +1,5 @@
 #include <aurora/drivers/tty.h>
+#include <aurora/drivers/pty.h>
 #include <aurora/drivers/console.h>
 #include <aurora/fs/devtmpfs.h>
 #include <aurora/proc/task.h>
@@ -491,6 +492,8 @@ void tty_subsys_init(void)
     devtmpfs_register_chrdev(4, 64, "ttyS0", &g_tty_fops, 0660);
     devtmpfs_register_chrdev(5, 1, "console", &g_tty_fops, 0600);
     devtmpfs_register_chrdev(5, 0, "tty", &g_tty_fops, 0666);
+
+    pty_subsys_init();
 
     printk("<6>[  0.000000] TTY: Subsystem initialized (VT1-VT6, tty0, ttyS0, console, tty)\n");
 }

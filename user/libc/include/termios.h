@@ -88,6 +88,9 @@ struct termios {
 #define TIOCGWINSZ  0x5413
 #define TIOCSWINSZ  0x5414
 #define TIOCNOTTY   0x5422
+#define FIONREAD    0x541B
+#define TIOCGPTN    0x80045430
+#define TIOCSPTLCK  0x40045431
 
 /* Actions for tcsetattr */
 #define TCSANOW   0

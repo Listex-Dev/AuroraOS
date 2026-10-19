@@ -2,6 +2,7 @@
 #define _ARPA_INET_H
 
 #include <netinet/in.h>
+#include <sys/socket.h>
 
 uint32_t htonl(uint32_t hostlong);
 uint16_t htons(uint16_t hostshort);

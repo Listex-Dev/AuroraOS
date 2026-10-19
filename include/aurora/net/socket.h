@@ -119,6 +119,7 @@ ssize_t socket_recvfrom(struct socket *sock, void *buf, size_t len, int flags,
                         struct sockaddr *src_addr, socklen_t *addrlen);
 int socket_shutdown(struct socket *sock, int how);
 int socket_enqueue_rx(struct socket *sock, const void *data, size_t len);
+int socket_dequeue_rx(struct socket *sock, void *buf, size_t len);
 
 /* System Call handlers */
 int64_t sys_socket(int domain, int type, int protocol);

@@ -75,4 +75,7 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
+int sscanf(const char *str, const char *format, ...);
+int vsscanf(const char *str, const char *format, va_list ap);
+
 #endif /* _STDIO_H */

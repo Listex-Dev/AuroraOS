@@ -224,6 +224,47 @@ struct super_block *devtmpfs_create(void)
     return sb;
 }
 
+struct dentry *devtmpfs_mkdir(const char *name, mode_t mode)
+{
+    if (!dev_sb || !name) return NULL;
+    for (struct dentry *c = dev_sb->s_root->d_subdirs; c != NULL; c = c->d_next) {
+        if (strcmp(c->d_name, name) == 0) return c;
+    }
+    struct inode *inode = inode_alloc(dev_sb);
+    if (!inode) return NULL;
+    inode->i_mode = S_IFDIR | (mode & 0777);
+    return dentry_create(name, dev_sb->s_root, inode);
+}
+
+int devtmpfs_register_chrdev_at(struct dentry *parent, uint32_t major, uint32_t minor,
+                                const char *name, struct file_operations *fops, mode_t mode)
+{
+    if (!dev_sb || !name || !fops || !parent) return -EINVAL;
+    for (struct dentry *c = parent->d_subdirs; c != NULL; c = c->d_next) {
+        if (strcmp(c->d_name, name) == 0 && c->d_inode) {
+            c->d_inode->i_mode = S_IFCHR | (mode & 0777);
+            c->d_inode->i_fop = fops;
+            c->d_inode->i_rdev = (major << 8) | (minor & 0xFF);
+            return 0;
+        }
+    }
+    struct inode *inode = inode_alloc(dev_sb);
+    if (!inode) return -ENOMEM;
+    inode->i_mode = S_IFCHR | (mode & 0777);
+    inode->i_fop = fops;
+    inode->i_rdev = (major << 8) | (minor & 0xFF);
+    struct dentry *d = dentry_create(name, parent, inode);
+    if (!d) {
+        inode_free(inode);
+        return -ENOMEM;
+    }
+    return 0;
+}
+
+extern struct file_operations g_tty_fops;
+extern struct file_operations g_ptmx_fops;
+extern struct file_operations g_pty_slave_fops;
+
 struct file_operations *chrdev_lookup(dev_t dev)
 {
     uint32_t major = (uint32_t)(dev >> 8);
@@ -233,8 +274,14 @@ struct file_operations *chrdev_lookup(dev_t dev)
         if (minor == 3) return &null_fops;
         if (minor == 5) return &zero_fops;
         if (minor == 8 || minor == 9) return &urandom_fops;
-    } else if (major == 4 || major == 5) {
-        return &console_fops;
+    } else if (major == 4) {
+        return &g_tty_fops;
+    } else if (major == 5) {
+        if (minor == 2) return &g_ptmx_fops;
+        return &g_tty_fops;
+    } else if (major == 136) {
+        return &g_pty_slave_fops;
     }
     return NULL;
 }
+

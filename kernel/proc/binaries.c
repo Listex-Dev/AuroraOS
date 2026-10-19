@@ -21,6 +21,12 @@ extern char bin_mount_start[],    bin_mount_end[];
 extern char bin_test_m12_start[], bin_test_m12_end[];
 extern char bin_ping_start[],     bin_ping_end[];
 extern char bin_test_m13_start[], bin_test_m13_end[];
+extern char bin_dhclient_start[], bin_dhclient_end[];
+extern char bin_nslookup_start[], bin_nslookup_end[];
+extern char bin_ifconfig_start[], bin_ifconfig_end[];
+extern char bin_netstat_start[],  bin_netstat_end[];
+extern char bin_wget_start[],     bin_wget_end[];
+extern char bin_test_m14_start[], bin_test_m14_end[];
 
 struct binary_entry {
     const char *path;
@@ -51,6 +57,14 @@ static const struct binary_entry builtin_table[] = {
     { "/bin/test_m12", bin_test_m12_start, bin_test_m12_end },
     { "/bin/ping",     bin_ping_start,     bin_ping_end },
     { "/bin/test_m13", bin_test_m13_start, bin_test_m13_end },
+    { "/bin/dhclient", bin_dhclient_start, bin_dhclient_end },
+    { "/sbin/dhclient",bin_dhclient_start, bin_dhclient_end },
+    { "/bin/nslookup", bin_nslookup_start, bin_nslookup_end },
+    { "/bin/ifconfig", bin_ifconfig_start, bin_ifconfig_end },
+    { "/sbin/ifconfig",bin_ifconfig_start, bin_ifconfig_end },
+    { "/bin/netstat",  bin_netstat_start,  bin_netstat_end },
+    { "/bin/wget",     bin_wget_start,     bin_wget_end },
+    { "/bin/test_m14", bin_test_m14_start, bin_test_m14_end },
     { NULL, NULL, NULL }
 };
 

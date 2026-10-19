@@ -31,6 +31,15 @@ uint16_t ip_checksum(const void *buf, size_t len)
 
 struct netdev *ipv4_route(uint32_t dst_ip, uint32_t *next_hop_ip)
 {
+    /* Broadcast address check (255.255.255.255) */
+    if (dst_ip == 0xFFFFFFFF || dst_ip == net_htonl(0xFFFFFFFF)) {
+        if (next_hop_ip) {
+            *next_hop_ip = 0xFFFFFFFF;
+        }
+        struct netdev *def = netdev_get_default();
+        return def ? def : netdev_get_by_name("eth0");
+    }
+
     /* Loopback check (127.0.0.0/8) */
     if ((dst_ip & net_htonl(0xFF000000)) == net_htonl(0x7F000000)) {
         if (next_hop_ip) {
