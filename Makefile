@@ -222,7 +222,7 @@ test: $(TARGET_BIN) $(DISK_IMG)
 	@output=$$(timeout 30s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) -append "test" \
-		-drive file=$(DISK_IMG),format=raw,if=ide \
+		-drive file=$(DISK_IMG),format=raw,if=ide,file.locking=off,snapshot=on \
 		-netdev user,id=net0 -device e1000,netdev=net0 \
 		-serial stdio \
 		-display none \

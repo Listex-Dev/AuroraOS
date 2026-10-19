@@ -22,6 +22,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <termios.h>
+#include <sys/ioctl.h>
 #include <signal.h>
 #include <errno.h>
 
@@ -43,6 +44,29 @@ static int g_last_exit_status = 0;
 static pid_t g_last_bg_pid = 0;
 static pid_t g_shell_pgid = 0;
 static int g_interactive = 0;
+
+#define MAX_HISTORY 64
+static char g_history[MAX_HISTORY][MAX_LINE];
+static int g_hist_count = 0;
+
+static void history_add(const char *cmd)
+{
+    if (!cmd || !*cmd) return;
+    if (g_hist_count > 0 && strcmp(g_history[(g_hist_count - 1) % MAX_HISTORY], cmd) == 0) {
+        return;
+    }
+    if (g_hist_count < MAX_HISTORY) {
+        strncpy(g_history[g_hist_count], cmd, MAX_LINE - 1);
+        g_history[g_hist_count][MAX_LINE - 1] = '\0';
+        g_hist_count++;
+    } else {
+        for (int i = 0; i < MAX_HISTORY - 1; i++) {
+            strcpy(g_history[i], g_history[i + 1]);
+        }
+        strncpy(g_history[MAX_HISTORY - 1], cmd, MAX_LINE - 1);
+        g_history[MAX_HISTORY - 1][MAX_LINE - 1] = '\0';
+    }
+}
 
 static void jobs_init(void)
 {
@@ -527,13 +551,20 @@ static int check_builtin(int argc, char **argv, int *ret)
         *ret = 0;
         return 1;
     }
+    if (strcmp(argv[0], "history") == 0) {
+        for (int i = 0; i < g_hist_count; i++) {
+            printf("%4d  %s\n", i + 1, g_history[i]);
+        }
+        *ret = 0;
+        return 1;
+    }
     if (strcmp(argv[0], "exit") == 0) {
         int code = (argc > 1) ? atoi(argv[1]) : g_last_exit_status;
         exit(code);
     }
     if (strcmp(argv[0], "help") == 0) {
         printf("AuroraOS POSIX Shell (/bin/sh)\n");
-        printf("Builtin commands: cd, pwd, echo, export, unset, set, test, [, true, false, :, jobs, fg, bg, wait, kill, type, which, clear, help, exit\n");
+        printf("Builtin commands: cd, pwd, echo, export, unset, set, test, [, true, false, :, jobs, fg, bg, wait, kill, type, which, clear, history, help, exit\n");
         *ret = 0;
         return 1;
     }
@@ -843,6 +874,290 @@ static int execute_line(char *line)
     return last_status;
 }
 
+static void redraw_line(const char *prompt, const char *buf, size_t old_len, size_t new_len)
+{
+    (void)old_len;
+    write(STDOUT_FILENO, "\r\033[2K", 5);
+    write(STDOUT_FILENO, prompt, strlen(prompt));
+    if (new_len > 0) {
+        write(STDOUT_FILENO, buf, new_len);
+    }
+}
+
+static char *sh_readline(const char *prompt, char *buf, size_t max_len)
+{
+    if (!g_interactive) {
+        if (!fgets(buf, max_len, stdin)) return NULL;
+        size_t l = strlen(buf);
+        if (l > 0 && buf[l - 1] == '\n') buf[l - 1] = '\0';
+        return buf;
+    }
+
+    struct termios orig_tio, raw_tio;
+    if (tcgetattr(STDIN_FILENO, &orig_tio) != 0) {
+        fputs(prompt, stdout);
+        fflush(stdout);
+        if (!fgets(buf, max_len, stdin)) return NULL;
+        size_t l = strlen(buf);
+        if (l > 0 && buf[l - 1] == '\n') buf[l - 1] = '\0';
+        return buf;
+    }
+
+    fputs(prompt, stdout);
+    fflush(stdout);
+
+    raw_tio = orig_tio;
+    raw_tio.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw_tio);
+
+    size_t len = 0;
+    size_t pos = 0;
+    buf[0] = '\0';
+
+    char current_saved[MAX_LINE];
+    current_saved[0] = '\0';
+    int hist_idx = g_hist_count;
+
+    while (1) {
+        char c;
+        ssize_t n = read(STDIN_FILENO, &c, 1);
+        if (n <= 0) {
+            tcsetattr(STDIN_FILENO, TCSANOW, &orig_tio);
+            if (len == 0) return NULL;
+            break;
+        }
+
+        if (c == '\r' || c == '\n') {
+            write(STDOUT_FILENO, "\n", 1);
+            break;
+        }
+
+        if (c == 0x03) { /* Ctrl-C */
+            write(STDOUT_FILENO, "^C\n", 3);
+            buf[0] = '\0';
+            len = 0;
+            pos = 0;
+            hist_idx = g_hist_count;
+            current_saved[0] = '\0';
+            fputs(prompt, stdout);
+            fflush(stdout);
+            continue;
+        }
+
+        if (c == 0x04) { /* Ctrl-D */
+            if (len == 0) {
+                tcsetattr(STDIN_FILENO, TCSANOW, &orig_tio);
+                return NULL;
+            }
+            if (pos < len) {
+                memmove(&buf[pos], &buf[pos + 1], len - pos);
+                len--;
+                buf[len] = '\0';
+                write(STDOUT_FILENO, &buf[pos], len - pos);
+                write(STDOUT_FILENO, " \b", 2);
+                for (size_t k = 0; k < len - pos; k++) {
+                    write(STDOUT_FILENO, "\b", 1);
+                }
+            }
+            continue;
+        }
+
+        if (c == 0x0C) { /* Ctrl-L: Clear screen */
+            write(STDOUT_FILENO, "\033[2J\033[H", 7);
+            fputs(prompt, stdout);
+            fflush(stdout);
+            write(STDOUT_FILENO, buf, len);
+            for (size_t k = pos; k < len; k++) {
+                write(STDOUT_FILENO, "\b", 1);
+            }
+            continue;
+        }
+
+        if (c == 0x01) { /* Ctrl-A: Home */
+            while (pos > 0) {
+                write(STDOUT_FILENO, "\b", 1);
+                pos--;
+            }
+            continue;
+        }
+
+        if (c == 0x05) { /* Ctrl-E: End */
+            while (pos < len) {
+                write(STDOUT_FILENO, &buf[pos], 1);
+                pos++;
+            }
+            continue;
+        }
+
+        if (c == 0x15) { /* Ctrl-U: Clear line */
+            size_t old_len = len;
+            len = 0;
+            pos = 0;
+            buf[0] = '\0';
+            redraw_line(prompt, buf, old_len, 0);
+            continue;
+        }
+
+        /* Escape sequence (arrows, function keys, delete) */
+        if (c == '\033') {
+            char seq[8];
+            int avail = 0;
+            for (int t = 0; t < 25; t++) {
+                if (ioctl(STDIN_FILENO, FIONREAD, &avail) == 0 && avail > 0) break;
+                usleep(1000);
+            }
+            if (avail > 0 && read(STDIN_FILENO, &seq[0], 1) == 1) {
+                if (seq[0] == '[' || seq[0] == 'O') {
+                    avail = 0;
+                    for (int t = 0; t < 25; t++) {
+                        if (ioctl(STDIN_FILENO, FIONREAD, &avail) == 0 && avail > 0) break;
+                        usleep(1000);
+                    }
+                    if (avail > 0 && read(STDIN_FILENO, &seq[1], 1) == 1) {
+                        if (seq[1] == 'A') {
+                            /* UP ARROW - Previous history */
+                            if (hist_idx > 0) {
+                                if (hist_idx == g_hist_count) {
+                                    strncpy(current_saved, buf, MAX_LINE - 1);
+                                    current_saved[MAX_LINE - 1] = '\0';
+                                }
+                                hist_idx--;
+                                size_t old_len = len;
+                                strncpy(buf, g_history[hist_idx], max_len - 1);
+                                buf[max_len - 1] = '\0';
+                                len = strlen(buf);
+                                pos = len;
+                                redraw_line(prompt, buf, old_len, len);
+                            }
+                        } else if (seq[1] == 'B') {
+                            /* DOWN ARROW - Next history */
+                            if (hist_idx < g_hist_count) {
+                                hist_idx++;
+                                size_t old_len = len;
+                                if (hist_idx == g_hist_count) {
+                                    strncpy(buf, current_saved, max_len - 1);
+                                } else {
+                                    strncpy(buf, g_history[hist_idx], max_len - 1);
+                                }
+                                buf[max_len - 1] = '\0';
+                                len = strlen(buf);
+                                pos = len;
+                                redraw_line(prompt, buf, old_len, len);
+                            }
+                        } else if (seq[1] == 'C') {
+                            /* RIGHT ARROW */
+                            if (pos < len) {
+                                write(STDOUT_FILENO, &buf[pos], 1);
+                                pos++;
+                            }
+                        } else if (seq[1] == 'D') {
+                            /* LEFT ARROW */
+                            if (pos > 0) {
+                                write(STDOUT_FILENO, "\b", 1);
+                                pos--;
+                            }
+                        } else if (seq[1] == 'H') {
+                            /* HOME */
+                            while (pos > 0) {
+                                write(STDOUT_FILENO, "\b", 1);
+                                pos--;
+                            }
+                        } else if (seq[1] == 'F') {
+                            /* END */
+                            while (pos < len) {
+                                write(STDOUT_FILENO, &buf[pos], 1);
+                                pos++;
+                            }
+                        } else if (seq[1] >= '0' && seq[1] <= '9') {
+                            char seq2[4];
+                            if (read(STDIN_FILENO, &seq2[0], 1) == 1 && seq2[0] == '~') {
+                                if (seq[1] == '3') {
+                                    /* DELETE */
+                                    if (pos < len) {
+                                        memmove(&buf[pos], &buf[pos + 1], len - pos);
+                                        len--;
+                                        buf[len] = '\0';
+                                        write(STDOUT_FILENO, &buf[pos], len - pos);
+                                        write(STDOUT_FILENO, " \b", 2);
+                                        for (size_t k = 0; k < len - pos; k++) {
+                                            write(STDOUT_FILENO, "\b", 1);
+                                        }
+                                    }
+                                } else if (seq[1] == '1' || seq[1] == '7') {
+                                    /* HOME */
+                                    while (pos > 0) {
+                                        write(STDOUT_FILENO, "\b", 1);
+                                        pos--;
+                                    }
+                                } else if (seq[1] == '4' || seq[1] == '8') {
+                                    /* END */
+                                    while (pos < len) {
+                                        write(STDOUT_FILENO, &buf[pos], 1);
+                                        pos++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
+        /* BACKSPACE */
+        if (c == '\b' || (unsigned char)c == 0x7F || c == 0x08) {
+            if (pos > 0) {
+                pos--;
+                memmove(&buf[pos], &buf[pos + 1], len - pos);
+                len--;
+                buf[len] = '\0';
+                write(STDOUT_FILENO, "\b", 1);
+                write(STDOUT_FILENO, &buf[pos], len - pos);
+                write(STDOUT_FILENO, " \b", 2);
+                for (size_t k = 0; k < len - pos; k++) {
+                    write(STDOUT_FILENO, "\b", 1);
+                }
+            }
+            continue;
+        }
+
+        /* Ignore Tab if not implementing autocomplete */
+        if (c == '\t') {
+            continue;
+        }
+
+        /* Printable character */
+        if ((unsigned char)c >= 32 && (unsigned char)c <= 126) {
+            if (len < max_len - 1) {
+                if (pos < len) {
+                    memmove(&buf[pos + 1], &buf[pos], len - pos);
+                    buf[pos] = c;
+                    len++;
+                    buf[len] = '\0';
+                    write(STDOUT_FILENO, &buf[pos], len - pos);
+                    pos++;
+                    for (size_t k = 0; k < len - pos; k++) {
+                        write(STDOUT_FILENO, "\b", 1);
+                    }
+                } else {
+                    buf[pos++] = c;
+                    len++;
+                    buf[len] = '\0';
+                    write(STDOUT_FILENO, &c, 1);
+                }
+            }
+            continue;
+        }
+    }
+
+    buf[len] = '\0';
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig_tio);
+    if (len > 0) {
+        history_add(buf);
+    }
+    return buf;
+}
+
 int main(int argc, char **argv)
 {
     g_shell_pgid = getpgrp();
@@ -876,24 +1191,15 @@ int main(int argc, char **argv)
     while (1) {
         jobs_check_status();
 
-        if (g_interactive) {
-            const char *ps1 = getenv("PS1");
-            if (!ps1) {
-                ps1 = (getuid() == 0) ? "aurora# " : "aurora$ ";
-            }
-            fputs(ps1, stdout);
-            fflush(stdout);
+        const char *ps1 = getenv("PS1");
+        if (!ps1) {
+            ps1 = (getuid() == 0) ? "aurora# " : "aurora$ ";
         }
 
-        if (!fgets(line, sizeof(line), stdin)) {
-            /* EOF: Ctrl-D */
+        if (!sh_readline(ps1, line, sizeof(line))) {
             if (g_interactive) putchar('\n');
             break;
         }
-
-        /* Strip trailing newline */
-        size_t len = strlen(line);
-        if (len > 0 && line[len - 1] == '\n') line[len - 1] = '\0';
 
         execute_line(line);
     }

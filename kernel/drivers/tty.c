@@ -333,9 +333,11 @@ static ssize_t tty_read(struct file *file, void *buf, size_t count, uint64_t *po
                 return -EAGAIN;
             }
             if (serial_has_rx()) {
-                char sc = serial_getc();
-                if (sc == '\r') sc = '\n';
-                tty_input_char(tty, sc);
+                while (serial_has_rx()) {
+                    char sc = serial_getc();
+                    if (sc == '\r') sc = '\n';
+                    tty_input_char(tty, sc);
+                }
                 continue;
             }
             sched_yield();
@@ -438,6 +440,11 @@ static int tty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
         case FIONREAD:
             if (!arg) return -EFAULT;
+            while (serial_has_rx()) {
+                char sc = serial_getc();
+                if (sc == '\r') sc = '\n';
+                tty_input_char(tty, sc);
+            }
             *(int *)arg = tty->in_count;
             return 0;
 
