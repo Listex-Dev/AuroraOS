@@ -1,106 +1,107 @@
 # AuroraOS 1.0.0
 
-[![Architecture](https://img.shields.io/badge/Architecture-x86--64%20(Long%20Mode)-blue.svg)](#)
-[![Status](https://img.shields.io/badge/Status-v1.0.0%20Released-brightgreen.svg)](#)
-[![Tests](https://img.shields.io/badge/Acceptance%20Tests-100%25%20Passing-success.svg)](#)
-[![Compliance](https://img.shields.io/badge/Standards-POSIX.1--2017%20%7C%20FHS%203.0-orange.svg)](#)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+[![Архитектура](https://img.shields.io/badge/Архитектура-x86--64%20(Long%20Mode)-blue.svg)](#)
+[![Статус](https://img.shields.io/badge/Статус-Релиз%20v1.0.0-brightgreen.svg)](#)
+[![Тесты](https://img.shields.io/badge/Приёмочные%20тесты-100%25%20пройдены-success.svg)](#)
+[![Стандарты](https://img.shields.io/badge/Стандарты-POSIX.1--2017%20%7C%20FHS%203.0-orange.svg)](#)
+[![Лицензия](https://img.shields.io/badge/Лицензия-MIT-purple.svg)](LICENSE)
 
-**AuroraOS** is an independent, from-scratch 64-bit Unix-like operating system designed for the x86-64 architecture. It adheres to the classical Unix philosophy and standard Linux abstractions: Virtual File System (`inode`, `dentry`, `file_operations`), device nodes with `major:minor`, `/dev`, `/proc`, `/sys`, preemptive multitasking, BSD sockets, SysV init, and a cryptographically signed package management system.
-
----
-
-## 🌟 Feature Highlights
-
-- **Kernel Core**:
-  - 64-bit Long Mode bootstrap with 4-level paging (`PML4` -> `PDPT` -> `PD` -> `PT`) and physical memory direct mapping.
-  - Physical Memory Manager (bitmap allocator) & dynamic kernel heap with slab caches.
-  - Preemptive multitasking scheduler (100 Hz PIT timer) with clean context switching and process isolation.
-  - Complete POSIX process lifecycle: `fork()`, `execve()` (ELF64 loader), `wait4()`/`waitpid()`, signals, and process reaping.
-
-- **Storage & VFS**:
-  - Virtual File System supporting hierarchical mount tables and dentry path resolution.
-  - **`ext4`** root filesystem driver with directory indexing, block allocation, and read/write support.
-  - Synthetic filesystems: `ramfs` (initrd), `devtmpfs` (automatic `/dev` node population), `procfs`, `sysfs`, `tmpfs`, `pipefs`, and `sockfs`.
-  - Storage block device drivers: ATA PIO and AHCI SATA controller support (`/dev/sda*`).
-
-- **Networking**:
-  - Full TCP/IP stack implemented from the wire up: Ethernet, ARP resolution cache, IPv4 routing, ICMP ping, UDP sockets, and TCP with dynamic sliding window and sequence tracking.
-  - BSD socket API (`socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `setsockopt`).
-  - Hardware drivers: Intel 82540EM (`e1000`) and VirtIO Network (`virtio-net`).
-  - Network applications: `dhclient`, `nslookup`, `ping`, `ifconfig`, `netstat`, `wget`, and `sshd`.
-
-- **Security & Multi-User Architecture**:
-  - Multi-user credential system (`uid`, `gid`, `euid`, `egid`, `umask`, `setuid`).
-  - Shadow password database (`/etc/shadow` mode `0640`) with SHA-512 password hashing.
-  - Kernel and userspace hardening: Stack Smashing Protection (`-fstack-protector-strong`) and hardware No-Execute (`NX` page bit).
-
-- **Terminal & Services**:
-  - Line discipline with canonical and raw modes, VT0..VT5 virtual consoles, and PTY allocation.
-  - Interactive `/bin/sh` shell featuring pipelines (`|`), I/O redirections (`>`, `<`, `>>`), background jobs (`&`), and script execution.
-  - SysV `init` (PID 1) with runlevels 0..6, `/etc/inittab`, and `/etc/init.d/` daemon management.
-  - Daemons: `syslogd` (system logging), `crond` (scheduled tasks), and `sshd` (remote terminal access).
-  - Package manager: `/bin/pkg` managing signed `.aurpkg` packages with HMAC-SHA256 verification.
-  - Online documentation: `man(1)` system and kernel message ring buffer inspection via `/bin/dmesg`.
+**AuroraOS** — это независимая 64-битная Unix-подобная операционная система, созданная с нуля для архитектуры x86-64. Система строго следует классической философии Unix и стандартным абстракциям Linux: виртуальная файловая система VFS (`inode`, `dentry`, `file_operations`), узлы устройств с `major:minor`, иерархия `/dev`, псевдо-ФС `/proc` и `/sys`, вытесняющая многозадачность, сетевой стек BSD сокетов, система инициализации SysV init и криптографически защищённый менеджер пакетов `pkg`.
 
 ---
 
-## 🚀 Quick Start
+## 🌟 Ключевые возможности
 
-### Prerequisites
-- GCC cross-compiler (`x86_64-linux-gnu-gcc` or host 64-bit GCC)
-- NASM assembler
-- QEMU (`qemu-system-x86_64`)
+- **Ядро и процессор**:
+  - Загрузка через Multiboot 1/2 и переход в 64-битный Long Mode.
+  - 4-уровневая страничная адресация (`PML4` -> `PDPT` -> `PD` -> `PT`) с прямым отображением физической памяти (Direct Mapping).
+  - Менеджер физической памяти (PMM, битовая карта) и динамическая куча ядра со slab-кэшами горячих структур (`kmalloc`/`kfree`).
+  - Вытесняющий планировщик задач (таймер PIT 100 Гц) с изолированными адресными пространствами и контекстным переключением.
+  - Полный жизненный цикл POSIX-процессов: `fork()`, загрузчик исполняемых файлов ELF64 `execve()`, сбор статусов `wait4()`/`waitpid()`, сигналы и очистка зомби-процессов.
+
+- **Файловая система и VFS**:
+  - Виртуальная файловая система (VFS) с поддержкой иерархических таблиц монтирования и кэширования путей (`dentry`).
+  - Драйвер корневой файловой системы **`ext4`** с поддержкой чтения и записи, индексных дескрипторов, экстентов и каталогов.
+  - Синтетические файловые системы: `ramfs` (initrd), `devtmpfs` (автоматическое создание узлов устройств в `/dev`), `procfs`, `sysfs`, `tmpfs`, `pipefs` и `sockfs`.
+  - Драйверы блочных устройств: контроллеры ATA PIO и AHCI SATA (`/dev/sda*`).
+
+- **Сетевой стек**:
+  - Полный стек сетевых протоколов TCP/IP: Ethernet (802.3), кэш разрешения адресов ARP, маршрутизация IPv4, эхо-запросы ICMP ping, датаграммы UDP и протокол TCP с управлением скользящим окном и отслеживанием последовательностей.
+  - Стандартный интерфейс сокетов BSD (`socket`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `setsockopt`).
+  - Аппаратные сетевые драйверы: Intel 82540EM (`e1000`) и паравиртуализованный VirtIO Network (`virtio-net`).
+  - Сетевые утилиты: `dhclient`, `nslookup`, `ping`, `ifconfig`, `netstat`, `wget` и демон `sshd`.
+
+- **Безопасность и многопользовательский режим**:
+  - Модель разграничения прав доступа Unix DAC (`uid`, `gid`, `euid`, `egid`, `umask`, бит `setuid`).
+  - База учётных записей `/etc/passwd` и защищённая база хешей паролей `/etc/shadow` (режим `0640`) с алгоритмом SHA-512 crypt.
+  - Аппаратная защита ядра и приложений: стековые канарейки (`-fstack-protector-strong`) и неисполняемый стек (NX/XD бит).
+
+- **Терминалы, службы и пакетный менеджер**:
+  - Дисциплина линий TTY (канонический и raw-режимы), виртуальные консоли VT0..VT5 и псевдотерминалы PTY.
+  - Командная оболочка `/bin/sh` с поддержкой конвейеров (`|`), перенаправлений ввода/вывода (`>`, `<`, `>>`), фонового запуска (`&`) и выполнения шелл-скриптов.
+  - Система инициализации SysV `init` (PID 1) с уровнями запуска 0..6, конфигурацией `/etc/inittab` и скриптами управления `/etc/init.d/`.
+  - Системные демоны: `syslogd` (журналирование), `crond` (планировщик периодических задач), `sshd` (удалённый доступ по SSH).
+  - Менеджер пакетов `/bin/pkg` с криптографической проверкой цифровых подписей HMAC-SHA256 архивов `.aurpkg`.
+  - Встроенная справочная система `man(1)` и чтение кольцевого буфера ядра `/bin/dmesg`.
+
+---
+
+## 🚀 Быстрый старт
+
+### Требования к окружению
+- Кросс-компилятор GCC (`x86_64-linux-gnu-gcc` или хостовый 64-битный GCC)
+- Ассемблер NASM
+- Эмулятор QEMU (`qemu-system-x86_64`)
 - GNU Make
 
-### Build and Launch
+### Сборка и запуск
 
-1. **Build Userland Utilities & Libc**:
+1. **Сборка системной библиотеки libc и утилит userland**:
    ```bash
    bash scripts/build_userland.sh
    ```
 
-2. **Build AuroraOS Kernel Image**:
+2. **Сборка образа ядра AuroraOS**:
    ```bash
    make kernel
    ```
 
-3. **Launch in QEMU**:
+3. **Запуск в эмуляторе QEMU**:
    ```bash
    make run
    ```
 
-### Default Credentials
+### Учётные данные по умолчанию
 
-| User | Password | Role |
+| Пользователь | Пароль | Роль |
 |---|---|---|
-| `root` | `root` | Superuser / Administrator |
-| `aurora` | `aurora` | Standard User |
+| `root` | `root` | Суперпользователь (полный доступ) |
+| `aurora` | `aurora` | Обычный непривилегированный пользователь |
 
 ---
 
-## 🧪 Testing & Verification
+## 🧪 Тестирование и верификация
 
-AuroraOS includes comprehensive acceptance and regression test suites covering all milestones:
+Система включает в себя исчерпывающий комплекс приёмочных и регрессионных тестов:
 
 ```bash
 make test
 ```
 
-The automated test runner executes within QEMU and verifies:
-- **M0..M4**: Bootstrapping, CPU exceptions, PMM/VMM allocation, context switching, and syscall gates.
-- **M5..M9**: Process lifecycle (`fork`/`exec`/`wait`), VFS file I/O, ext4 filesystem persistence, and TTY line discipline.
-- **M10..M14**: Libc compliance, `/bin/sh` scripting, block devices (`fdisk`/`mount`), TCP/IP networking, DHCP, DNS, and `wget`.
-- **M15..M17**: Shadow credentials, `su`, NX/canary traps, `syslogd`, `crond`, `sshd`, and signed `.aurpkg` package installation.
-- **M18**: Libc crypto vectors (NIST SHA-256), `/bin/dmesg` ring buffer, documentation presence, and process stress loops.
+Автоматизированный тестовый раннер запускается в QEMU и проверяет:
+- **M0..M4**: Загрузку, обработку исключений CPU, PMM/VMM аллокаторы, переключение контекстов и системные вызовы.
+- **M5..M9**: Управление процессами (`fork`/`exec`/`wait`), операции VFS, целостность ext4 и дисциплину линий TTY.
+- **M10..M14**: Функции libc, скрипты `/bin/sh`, блочные устройства (`fdisk`/`mount`), стек TCP/IP, DHCP, DNS и `wget`.
+- **M15..M17**: Безопасность shadow, смену пользователя `su`, ловушки NX/canary, службы `syslogd`, `crond`, `sshd` и установку подписанных пакетов `.aurpkg`.
+- **M18**: Тестовые векторы криптографии (NIST SHA-256), чтение журнала ядра `/bin/dmesg`, документацию и стресс-тест процессов.
 
 ---
 
-## 📚 Documentation Index
+## 📚 Навигация по документации
 
-- [SPECIFICATION.md](SPECIFICATION.md) — Complete authoritative architectural and functional specification.
-- [docs/ARCH.md](docs/ARCH.md) — Kernel and system subsystem architecture.
-- [docs/ABI.md](docs/ABI.md) — System call ABI, registers, ELF64 memory layout, and signal frames.
-- [docs/PORTING.md](docs/PORTING.md) — Application porting guide, libc headers, and `.aurpkg` packaging.
-- [docs/CODING_STYLE.md](docs/CODING_STYLE.md) — Coding conventions, formatting standards, and commit guidelines.
-- [docs/HANDBOOK.md](docs/HANDBOOK.md) — Comprehensive user and system administrator handbook.
+- [SPECIFICATION.md](SPECIFICATION.md) — Полная техническая спецификация системы и критерии приёмки v1.0.
+- [docs/ARCH.md](docs/ARCH.md) — Подробное описание архитектуры ядра и подсистем.
+- [docs/ABI.md](docs/ABI.md) — Спецификация ABI системных вызовов, регистров, формата памяти ELF64 и сигналов.
+- [docs/PORTING.md](docs/PORTING.md) — Руководство по портированию программ, заголовочным файлам libc и сборке пакетов `.aurpkg`.
+- [docs/CODING_STYLE.md](docs/CODING_STYLE.md) — Стандарты кодирования, соглашения об именовании и правила коммитов.
+- [docs/HANDBOOK.md](docs/HANDBOOK.md) — Полное руководство администратора и пользователя AuroraOS.

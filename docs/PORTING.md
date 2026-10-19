@@ -1,22 +1,22 @@
-# Porting Applications to AuroraOS
+# Портирование приложений в AuroraOS
 
-This guide covers porting third-party C/C++ software, compiling userland binaries, and creating cryptographically signed packages for **AuroraOS 1.0**.
+В этом руководстве описываются процессы портирования стороннего программного обеспечения на C/C++, компиляции пользовательских бинарных файлов и создания криптографически подписанных пакетов для **AuroraOS 1.0**.
 
 ---
 
-## 1. Toolchain & Target Environment
+## 1. Инструменты сборки и целевое окружение
 
-AuroraOS uses a standard LP64 data model for x86-64:
+AuroraOS использует стандартную модель данных LP64 для архитектуры x86-64:
 - `sizeof(int) = 4`
 - `sizeof(long) = 8`
 - `sizeof(void *) = 8`
 - `sizeof(size_t) = 8`
 
-Binaries in AuroraOS 1.0 are statically linked ELF64 executables with entry point at `0x0000000000401000`.
+Исполняемые файлы в AuroraOS 1.0 представляют собой статически слинкованные бинарные файлы формата ELF64 с точкой входа по адресу `0x0000000000401000`.
 
-### Required Compiler Flags
+### Необходимые флаги компилятора
 
-When building binaries on the host system (Linux / WSL) for AuroraOS:
+При кросс-компиляции на хост-системе (Linux / WSL) используются следующие параметры:
 
 ```bash
 GCC_FLAGS="-nostdinc -isystem $(PWD)/user/libc/include \
@@ -29,19 +29,19 @@ LD_FLAGS="-static -nostdlib"
 
 ---
 
-## 2. Compiling with AuroraOS Libc
+## 2. Сборка с системной библиотекой AuroraOS Libc
 
-AuroraOS provides a standard POSIX C library located in `user/libc/`.
+AuroraOS предоставляет реализацию стандартной библиотеки Си в каталоге `user/libc/`.
 
-### Linking Workflow
+### Процесс линковки
 
-To compile and link a program `myprog.c`:
+Сборка и линковка пользовательской программы `myprog.c`:
 
 ```bash
-# 1. Compile C source into object
+# 1. Компиляция исходного кода в объектный файл
 x86_64-linux-gnu-gcc $GCC_FLAGS -c myprog.c -o myprog.o
 
-# 2. Link against AuroraOS crt0 and libc.a
+# 2. Статическая линковка с crt0.o и libc.a
 x86_64-linux-gnu-ld $LD_FLAGS \
     build/libc/crt0.o \
     myprog.o \
@@ -49,7 +49,7 @@ x86_64-linux-gnu-ld $LD_FLAGS \
     -o myprog
 ```
 
-### Supported C Standard Headers
+### Поддерживаемые стандартные заголовочные файлы
 
 - `<stdio.h>`: `printf`, `sprintf`, `snprintf`, `fopen`, `fclose`, `fread`, `fwrite`, `fgets`, `fputs`, `stdin`, `stdout`, `stderr`.
 - `<stdlib.h>`: `malloc`, `calloc`, `realloc`, `free`, `exit`, `atoi`, `strtol`, `strtoul`, `abs`.
@@ -69,48 +69,48 @@ x86_64-linux-gnu-ld $LD_FLAGS \
 
 ---
 
-## 3. Package Management & Distribution (`.aurpkg`)
+## 3. Управление пакетами и дистрибуция (`.aurpkg`)
 
-All software packages for AuroraOS are packaged into `.aurpkg` archives, signed cryptographically with HMAC-SHA256.
+Все пакеты программного обеспечения для AuroraOS упаковываются в защищённый формат архивов `.aurpkg`, снабжённых криптографической цифровой подписью HMAC-SHA256.
 
-### Package File Format
+### Формат бинарного пакета
 
 ```
 +-----------------------------------------------------------+
-| Magic: "AURPKG01" (8 bytes)                               |
+| Сигнатура (Magic): "AURPKG01" (8 байт)                    |
 +-----------------------------------------------------------+
-| Package Name (32 bytes, null-padded)                      |
+| Имя пакета (32 байта, дополнено нулями)                   |
 +-----------------------------------------------------------+
-| Package Version (16 bytes, e.g. "1.0.0\0")                |
+| Версия пакета (16 байт, например "1.0.0\0")               |
 +-----------------------------------------------------------+
-| Flags (uint32_t)                                          |
+| Флаги пакета (uint32_t)                                   |
 +-----------------------------------------------------------+
-| Total File Count (uint32_t)                               |
+| Общее количество файлов (uint32_t)                        |
 +-----------------------------------------------------------+
-| HMAC-SHA256 Signature (64 bytes hex string)               |
+| Цифровая подпись HMAC-SHA256 (64 байта hex-строки)        |
 +-----------------------------------------------------------+
-| File Entry 0 Header:                                      |
-| - Target Path: e.g. "/usr/bin/myprog" (128 bytes)         |
-| - File Mode: e.g. 0755 (uint32_t)                         |
-| - File Size: bytes (uint32_t)                             |
-| - Data: raw bytes                                         |
+| Заголовок файла 0:                                        |
+| - Целевой путь установки: например "/usr/bin/myprog" (128)|
+| - Права доступа (File Mode): например 0755 (uint32_t)     |
+| - Размер файла: в байтах (uint32_t)                       |
+| - Содержимое файла: сырые байты данных                    |
 +-----------------------------------------------------------+
-| ... File Entry N ...                                      |
+| ... Последующие файлы 1..N ...                            |
 +-----------------------------------------------------------+
 ```
 
-### Creating Packages
+### Создание пакетов на хосте
 
-Use the `tools/pkg-build` utility on the host system:
+Для сборки пакетов используется утилита `tools/pkg-build`:
 
-1. Prepare a staging directory containing the files to be installed:
+1. Подготовьте каталог со структурой файлов для установки:
    ```bash
    mkdir -p staging/usr/bin staging/usr/share/man/man1
    cp myprog staging/usr/bin/
    cp myprog.1 staging/usr/share/man/man1/
    ```
 
-2. Generate the signed `.aurpkg` archive using the release signing key:
+2. Соберите подписанный архив `.aurpkg` с использованием доверенного ключа релиза:
    ```bash
    ./tools/pkg-build create \
        --name myprog \
@@ -120,30 +120,30 @@ Use the `tools/pkg-build` utility on the host system:
        --output build/packages/myprog-1.0.0.aurpkg
    ```
 
-3. Verification on the host:
+3. Проверка пакета на стороне хоста:
    ```bash
    ./tools/pkg-build verify \
        --package build/packages/myprog-1.0.0.aurpkg \
        --key user/etc/pkg/trusted/aurora.key
    ```
 
-### Installing Packages in AuroraOS
+### Управление пакетами в AuroraOS
 
-Boot AuroraOS in QEMU and execute `/bin/pkg`:
+Запустите AuroraOS в QEMU и управляйте пакетами утилитой `/bin/pkg`:
 
 ```bash
-# Install package (atomically extracts files and verifies signature)
+# Установка пакета (проверка подписи и атомарная распаковка)
 pkg install /packages/myprog-1.0.0.aurpkg
 
-# Query installed packages
+# Список установленных пакетов
 pkg list
 
-# Inspect package details
+# Просмотр детальной информации о пакете
 pkg info myprog
 
-# View installed manual page
+# Просмотр установленного руководства
 man myprog
 
-# Uninstall package
+# Удаление пакета
 pkg remove myprog
 ```

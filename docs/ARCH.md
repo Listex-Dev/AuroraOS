@@ -1,88 +1,94 @@
-# AuroraOS Architecture Overview
+# Архитектура операционной системы AuroraOS
 
-**AuroraOS** is a 64-bit Unix-like monolithic operating system written for the x86-64 architecture from scratch. It adheres strictly to POSIX.1-2017 standards, FHS 3.0 directory hierarchy, and standard Linux/Unix system abstractions (`inode`, `dentry`, `file_operations`, `major:minor`, `/dev`, `/proc`, `/sys`, `fork`/`exec`/`wait`, BSD sockets).
+**AuroraOS** — это 64-битная Unix-подобная монолитная операционная система для процессорной архитектуры x86-64, разработанная с чистого листа. Система полностью следует стандарту POSIX.1-2017, стандарту иерархии файловой системы FHS 3.0 и классическим архитектурным моделям Linux/Unix: виртуальная файловая система VFS (`inode`, `dentry`, `file_operations`), узлы устройств с номерами `major:minor`, каталоги `/dev`, `/proc`, `/sys`, системные вызовы `fork`/`exec`/`wait`, сокеты BSD.
 
 ---
 
-## 1. Hardware & CPU Initialization
+## 1. Аппаратная инициализация и процессор
 
 ```
 [ BIOS / UEFI ]
        │
        ▼
- [ Multiboot 1/2 ] ──> boot/boot.S (32-bit Protected Mode)
+ [ Multiboot 1/2 ] ──> boot/boot.S (32-битный защищённый режим)
                             │
-                            ├─ Set up identity page tables (PML4)
-                            ├─ Enable PAE, Long Mode (EFER.LME) & Paging
-                            ├─ Load 64-bit GDT (Kernel Code 0x08, Data 0x10)
+                            ├─ Настройка начальных таблиц страниц (PML4)
+                            ├─ Включение PAE, Long Mode (EFER.LME) и Paging
+                            ├─ Загрузка 64-битной GDT (Kernel Code 0x08, Data 0x10)
                             │
                             ▼
-                     kernel/main.c (64-bit Long Mode)
+                     kernel/main.c (64-битный Long Mode)
 ```
 
-1. **Bootstrapping**:
-   - The bootloader loads `build/aurora.elf` via Multiboot 1 / Multiboot 2 specification.
-   - [boot/boot.S](file:///d:/DevProject/AuroraOS/boot/boot.S) sets up a temporary bootstrap page table identity-mapping the lowest 1 GiB of physical RAM.
-   - Transitions CPU into x86-64 Long Mode by enabling Physical Address Extension (`CR4.PAE = 1`), Long Mode Enable (`IA32_EFER.LME = 1`), and Paging (`CR0.PG = 1`).
-   - Long jumps to 64-bit subsegment and passes Multiboot Information pointer to `kmain()`.
+1. **Загрузка и переход в Long Mode**:
+   - Загрузчик передаёт управление образу `build/aurora.elf` по спецификации Multiboot 1 / Multiboot 2.
+   - Ассемблерный модуль [boot/boot.S](file:///d:/DevProject/AuroraOS/boot/boot.S) конфигурирует начальные таблицы страниц, отображая первые 1 ГиБ физической памяти (identity map).
+   - Процессор переводится в режим x86-64 Long Mode путём включения Physical Address Extension (`CR4.PAE = 1`), бита Long Mode Enable в MSR (`IA32_EFER.LME = 1`) и страничной адресации (`CR0.PG = 1`).
+   - Дальний переход (`far jump`) переключает процессор на исполнение 64-битного кода ядра и передаёт управление функции `kmain()`.
 
-2. **GDT & TSS**:
-   - The Global Descriptor Table defines 64-bit Kernel Code (`0x08`), Kernel Data (`0x10`), User Data (`0x18 | 3`), and User Code (`0x20 | 3`), followed by a 16-byte Task State Segment (TSS) descriptor.
-   - The TSS stores the privilege level 0 stack pointer (`RSP0`) switched automatically on hardware interrupts, exceptions, and syscall transitions.
+2. **Таблицы дескрипторов GDT и TSS**:
+   - Глобальная таблица дескрипторов (GDT) определяет селекторы:
+     - `0x08`: 64-битный код ядра (DPL=0)
+     - `0x10`: 64-битные данные ядра (DPL=0)
+     - `0x18 | 3`: Пользовательские данные Ring 3 (DPL=3)
+     - `0x20 | 3`: Пользовательский 64-битный код Ring 3 (DPL=3)
+     - 16-байтный дескриптор сегмента состояния задачи (TSS).
+   - В TSS прописывается указатель на стек нулевого уровня привилегий (`RSP0`), на который процессор автоматически переключается при возникновении аппаратных прерываний, исключений и системных вызовов из Ring 3.
 
-3. **IDT & Interrupts**:
-   - Interrupt Descriptor Table handles 256 vectors:
-     - Vectors `0..31`: CPU exceptions (#DE, #DB, #BP, #OF, #BR, #UD, #NM, #DF, #TS, #NP, #SS, #GP, #PF, #MF, #AC, #MC, #XM).
-     - Vector `32` (IRQ0): PIT Timer (100 Hz).
-     - Vector `33` (IRQ1): PS/2 Keyboard.
-     - Vector `36` (IRQ4): Serial COM1 (115200 baud).
-     - Vector `43` (IRQ11): PCI / Network (e1000 / virtio-net).
-     - Vector `46` (IRQ14): ATA Primary Channel.
-     - Vector `128` (`0x80`): Legacy Linux-compatible Syscall Gate.
+3. **Таблица прерываний IDT**:
+   - Настроены 256 шлюзов прерываний IDT:
+     - Векторы `0..31`: Аппаратные исключения процессора (#DE деление на ноль, #UD неверная инструкция, #DF двойной сбой, #GP общая защита, #PF ошибка страницы и др.).
+     - Вектор `32` (IRQ0): Системный таймер PIT (частота 100 Гц).
+     - Вектор `33` (IRQ1): Контроллер клавиатуры PS/2.
+     - Вектор `36` (IRQ4): Последовательный порт COM1 (115200 бод).
+     - Вектор `43` (IRQ11): Прерывания шины PCI (сетевые карты e1000 / virtio-net).
+     - Вектор `46` (IRQ14): Контроллер жестких дисков ATA Primary.
+     - Вектор `128` (`0x80`): Совместимый с Linux шлюз системных вызовов.
 
 ---
 
-## 2. Memory Management
+## 2. Управление памятью
 
 ```
 +------------------------------------+ 0xFFFFFFFFFFFFFFFF
-| Higher Half Kernel Virtual Memory  |
-| - Direct Physical Map (PhysOffset) |
-| - Kernel Heap (kmalloc/kfree)      |
-| - Slab Caches                      |
+| Старшая половина (Kernel Space)    |
+| - Прямое отображение (Direct Map)  |
+| - Динамическая куча (kmalloc/free) |
+| - Slab-кэши горячих структур       |
 +------------------------------------+ 0xFFFF800000000000
-| Non-Canonical Gap                  |
+| Неканоническая дыра (Non-Canonical)|
 +------------------------------------+ 0x00007FFFFFFFFFFF
-| Userspace Memory:                  |
-| - User Stack (grows down, NX)      |
-| - Heap (brk)                       |
-| - BSS & Data                       |
-| - Code / Text (.text, RX)          |
+| Младшая половина (User Space):     |
+| - Стек пользователя (вниз, NX)     |
+| - Куча процесса (brk, вверх)       |
+| - Сегменты BSS и инициализ. данных |
+| - Исполняемый код (.text, RX)      |
 +------------------------------------+ 0x0000000000400000
 ```
 
-1. **Physical Memory Manager (PMM)**:
-   - Uses a bitmap allocator tracking 4 KiB physical page frames parsed from the Multiboot memory map.
-   - Manages reserved regions (kernel image, initrd, ACPI tables, MMIO) and provides `pmm_alloc_page()` / `pmm_free_page()`.
+1. **Менеджер физической памяти (PMM)**:
+   - Аллокатор на базе битовой карты, отслеживающий физические страницы по 4 КиБ.
+   - Карта формируется на основе Multiboot memory map с исключением зарезервированных регионов (образ ядра, initrd, таблицы ACPI, видеопамять).
+   - Предоставляет интерфейсы `pmm_alloc_page()` / `pmm_free_page()`.
 
-2. **Virtual Memory Manager (VMM)**:
-   - 4-level paging (`PML4` -> `PDPT` -> `PD` -> `PT`).
-   - Implements Direct Mapping: all physical RAM is mapped into higher-half virtual address space starting at `PHYS_MAP_BASE`.
-   - Per-process page directories: each task owns an independent PML4 with lower-half userspace mappings (`0x0000000000400000` to `0x00007FFFFFFFFFFF`) while sharing kernel higher-half mappings.
-   - Protection attributes: `PAGE_PRESENT`, `PAGE_WRITABLE`, `PAGE_USER`, and `PAGE_NX` (Execute-Disable bit 63).
+2. **Менеджер виртуальной памяти (VMM)**:
+   - Четырёхуровневые таблицы страниц (`PML4` -> `PDPT` -> `PD` -> `PT`).
+   - Прямое отображение (Direct Mapping): вся доступная физическая память спроецирована в старшую половину виртуального пространства ядра.
+   - Изоляция процессов: каждый процесс обладает собственным каталогом страниц PML4, изолирующим пользовательскую память младшей половины (`0x0000000000400000` — `0x00007FFFFFFFFFFF`). Старшая половина ядра разделяется всеми процессами.
+   - Атрибуты защиты: `PAGE_PRESENT`, `PAGE_WRITABLE`, `PAGE_USER`, `PAGE_NX` (бит запрета исполнения).
 
-3. **Kernel Heap & Slabs**:
-   - Dynamic memory allocator (`kmalloc` / `kfree`) providing variable-sized memory blocks.
-   - Specialized slab caches for hot kernel data structures (`task_struct`, `inode`, `dentry`, `file`, `socket`).
+3. **Куча ядра и Slab-кэши**:
+   - Динамический аллокатор `kmalloc` / `kfree` для блоков произвольного размера.
+   - Специализированные пулы slab-кэшей для структур: `task_struct`, `inode`, `dentry`, `file`, `socket`.
 
-4. **Userspace Memory Layout**:
-   - Base executable loaded at `0x0000000000400000`.
-   - Program break (`brk`) expands the userspace heap dynamically.
-   - Userspace stack is placed at `0x00007FFFFFFFE000` growing downwards, marked Non-Executable (`NX`) to prevent shellcode injection.
+4. **Память пространства пользователя (Ring 3)**:
+   - Исполняемый файл отображается с базового адреса `0x0000000000400000`.
+   - Граница кучи пользователя перемещается вызовом `sys_brk`.
+   - Пользовательский стек размещается с вершины `0x00007FFFFFFFE000` и растёт вниз; страницы стека помечены битом `NX` (No-Execute) для предотвращения атак переполнения буфера.
 
 ---
 
-## 3. Process Management & Multitasking
+## 3. Управление процессами и многозадачность
 
 ```
                        +----------------+
@@ -109,128 +115,129 @@
                 └─────────────────────────────┴─> REAPED
 ```
 
-1. **Task Representation (`task_struct`)**:
-   - PID, PPID, state (`TASK_RUNNING`, `TASK_INTERRUPTIBLE`, `TASK_UNINTERRUPTIBLE`, `TASK_ZOMBIE`, `TASK_DEAD`).
-   - Registers (`struct pt_regs`), kernel stack (`RSP0`), userspace stack pointer, page directory (`cr3`).
-   - Credentials: `uid`, `gid`, `euid`, `egid`, `umask`.
-   - File descriptor table (`struct file *files[MAX_FILES]`).
-   - Signal handling table: actions, pending mask, blocked mask.
-   - Memory descriptors: `start_code`, `end_code`, `start_brk`, `brk`, `start_stack`.
+1. **Дескриптор процесса (`task_struct`)**:
+   - Идентификаторы: PID, PPID.
+   - Состояния: `TASK_RUNNING`, `TASK_INTERRUPTIBLE`, `TASK_UNINTERRUPTIBLE`, `TASK_ZOMBIE`, `TASK_DEAD`.
+   - Регистровый контекст (`struct pt_regs`), стек ядра (`RSP0`), стек пользователя, указатель на директорию страниц (`CR3`).
+   - Учётные данные: `uid`, `gid`, `euid`, `egid`, маска прав `umask`.
+   - Таблица файловых дескрипторов (`struct file *files[MAX_FILES]`).
+   - Таблица обработки сигналов: диспозиции, маска заблокированных сигналов, ожидающие сигналы.
+   - Границы памяти: `start_code`, `end_code`, `start_brk`, `brk`, `start_stack`.
 
-2. **Preemptive Scheduler**:
-   - PIT timer fires at 100 Hz (10 ms time slice).
-   - Round-robin / priority-based preemptive scheduling via `schedule()`.
-   - Context switching (`context.S`) saves and restores CPU registers (`RBX`, `RSP`, `RBP`, `R12`-`R15`, `CR3`).
+2. **Вытесняющий планировщик**:
+   - Таймер PIT генерирует кванты времени каждые 10 мс (100 Гц).
+   - Вытесняющее циклическое планирование с учётом приоритетов через вызов `schedule()`.
+   - Процедура переключения контекста на ассемблере (`context.S`) сохраняет и загружает состояние регистров общего назначения (`RBX`, `RSP`, `RBP`, `R12`-`R15`, `CR3`).
 
-3. **Process Lifecycle**:
-   - `fork()`: clones the calling process, creates a new PML4, copies page tables with Copy-On-Write or page duplication, duplicates open file descriptors, assigns unique PID.
-   - `execve()`: parses 64-bit ELF executable, validates ELF magic and ABI, tears down existing user address space, maps ELF segments (`LOAD`), initializes stack frame with `argc`, `argv`, `envp`, and ELF Auxiliary Vectors (`AT_PHDR`, `AT_PHENT`, `AT_PHNUM`, `AT_PAGESZ`, `AT_ENTRY`), switches to Ring 3.
-   - `wait4()` / `waitpid()`: reaps terminated children, returns exit status, cleans up zombie structures preventing process table leaks.
+3. **Жизненный цикл процессов**:
+   - `fork()`: создаёт точную копию вызывающего процесса, выделяет новый каталог PML4, дублирует таблицы страниц, копирует дескрипторы открытых файлов, назначает уникальный PID.
+   - `execve()`: валидирует заголовок ELF64, освобождает прежнее адресное пространство, отображает сегменты `LOAD`, формирует стек пользователя с аргументами `argc`, `argv`, переменными окружения `envp` и вспомогательным вектором ELF auxv (`AT_PHDR`, `AT_ENTRY`, `AT_PAGESZ`), переключает CPU в Ring 3.
+   - `wait4()` / `waitpid()`: переводит родителя в режим ожидания, считывает код завершения дочернего процесса и корректно освобождает структуру зомби, исключая утечки ресурсов.
 
 ---
 
-## 4. Virtual File System (VFS)
+## 4. Виртуальная файловая система (VFS)
 
 ```
-                       [ Syscall Layer: open / read / write / stat ]
+                       [ Системные вызовы: open / read / write / stat ]
                                            │
                                            ▼
-                             [ VFS Inode & Dentry Cache ]
+                             [ Кэш Inode и Dentry VFS ]
                                            │
         ┌──────────────┬───────────────────┼───────────────────┬──────────────┐
         ▼              ▼                   ▼                   ▼              ▼
      [ext4]         [ramfs]            [devtmpfs]           [procfs]       [sysfs]
-  (Root / Disk)    (Initrd)          (/dev nodes)          (/proc/PID)    (/sys/class)
+ (Корневой диск)   (Initrd)          (Узлы /dev)          (Данные /proc) (/sys/class)
         │
         ▼
-   [Block Dev]
+   [Блочное устр.]
  (ATA / AHCI /dev/sda)
 ```
 
-1. **Core Abstractions**:
-   - `struct inode`: stores file metadata, mode (`S_IFREG`, `S_IFDIR`, `S_IFCHR`, `S_IFBLK`, `S_IFIFO`, `S_IFLNK`), UID, GID, size, timestamps, block pointers.
-   - `struct dentry`: directory tree node caching hierarchical paths and names, accelerating path resolution (`namei`).
-   - `struct file`: represents an open file instance with file offset (`f_pos`), flags (`O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREAT`, `O_APPEND`), and driver operations pointer.
-   - `struct file_operations`: generic function pointer table (`read`, `write`, `open`, `close`, `lseek`, `ioctl`, `readdir`, `poll`).
+1. **Основные структуры**:
+   - `struct inode`: хранит метаданные файла, тип и права доступа (`S_IFREG`, `S_IFDIR`, `S_IFCHR`, `S_IFBLK`, `S_IFIFO`), UID, GID, размер, временные метки, указатели на блоки данных.
+   - `struct dentry`: узел дерева каталогов, кэширующий имена файлов и пути для ускорения разрешения путей (`namei`).
+   - `struct file`: экземпляр открытого файла, содержащий текущее смещение (`f_pos`), флаги открытия (`O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREAT`) и таблицу операций драйвера.
+   - `struct file_operations`: таблица указателей на функции подсистемы (`read`, `write`, `open`, `close`, `lseek`, `ioctl`, `readdir`).
 
-2. **Filesystem Drivers**:
-   - **`ext4`**: Root filesystem driver with standard superblock parsing, block group descriptors, inode tables, direct/indirect/extent blocks, directory entry parsing, and write support.
-   - **`ramfs`**: In-memory filesystem used for early boot and `initrd` mounting.
-   - **`devtmpfs`**: Populates `/dev` automatically with character and block device nodes reflecting major:minor numbers (e.g. `/dev/null` [1:3], `/dev/zero` [1:5], `/dev/tty0` [4:0], `/dev/sda` [8:0]).
-   - **`procfs`**: Synthetic filesystem under `/proc` exposing kernel state (`/proc/meminfo`, `/proc/cpuinfo`, `/proc/uptime`, `/proc/<pid>/status`, `/proc/<pid>/cmdline`).
-   - **`sysfs`**: Hierarchy under `/sys` exposing hardware topology, network interfaces (`/sys/class/net/eth0`), and block devices.
-   - **`tmpfs`**: In-memory scratch storage for `/tmp` and `/run`.
-   - **`pipefs` / `sockfs`**: Synthetic filesystems backing anonymous pipes (`pipe2`) and Unix/Internet sockets.
-
----
-
-## 5. Network Subsystem
-
-```
-                    [ User Applications: wget / ping / sshd / nslookup ]
-                                           │
-                                           ▼
-                            [ BSD Socket Syscall Layer ]
-                               (socket, connect, listen, ...)
-                                           │
-                        ┌──────────────────┴──────────────────┐
-                        ▼                                     ▼
-                [ TCP Protocol ]                      [ UDP Protocol ]
-           - 3-Way Handshake (SYN/ACK)             - Datagram sending/receiving
-           - Sequence & ACK Tracking               - Checksum verification
-           - Sliding Window Flow Control           - DNS query support
-           - Teardown (FIN/ACK, TIME_WAIT)
-                        └──────────────────┬──────────────────┘
-                                           │
-                                           ▼
-                                    [ IPv4 Layer ]
-                               - Packet routing & filtering
-                               - Fragment handling & TTL
-                               - ICMP Ping Echo & Reply
-                                           │
-                                           ▼
-                                    [ ARP Engine ]
-                               - Dynamic MAC resolution table
-                               - ARP Request / Reply cache
-                                           │
-                                           ▼
-                               [ Network Interface (netif) ]
-                                           │
-                        ┌──────────────────┴──────────────────┐
-                        ▼                                     ▼
-                 [ Intel e1000 ]                       [ VirtIO-Net ]
-```
-
-1. **Architecture**:
-   - Packet processing engine built around `struct net_buf` descriptors.
-   - Dedicated network worker thread handling incoming interrupt ring queues.
-
-2. **Protocol Implementations**:
-   - **Ethernet & ARP**: Decodes 802.3 frames, maintains ARP resolution table with broadcast query and expiration.
-   - **IPv4**: Validates header checksums, handles local delivery vs forwarding, routes via default gateway.
-   - **ICMP**: Generates ICMP Echo Replies for incoming pings; supports userspace ICMP sockets (`/bin/ping`).
-   - **UDP**: Datagram multiplexing by port numbers; powers DHCP client and DNS resolver (`gethostbyname`).
-   - **TCP**: Full transmission control protocol engine featuring:
-     - 3-way handshake state machine (`SYN_SENT`, `SYN_RECEIVED`, `ESTABLISHED`).
-     - Dynamic receive/transmit sliding windows preventing buffer overflows.
-     - Sequence number tracking and ACK synthesis.
-     - Clean connection teardown (`FIN_WAIT_1`, `FIN_WAIT_2`, `CLOSE_WAIT`, `LAST_ACK`, `TIME_WAIT`).
-     - BSD socket API integration supporting blocking and non-blocking I/O.
-
-3. **Hardware Drivers**:
-   - **Intel 82540EM (e1000)**: PCI bus probing, TX/RX ring descriptor buffer setup, hardware checksum offload.
-   - **VirtIO-Net**: Paravirtualized network driver utilizing virtqueues for minimal host virtualization overhead.
+2. **Драйверы файловых систем**:
+   - **`ext4`**: Полноценный драйвер с поддержкой чтения и записи, разбором суперблока, дескрипторов групп блоков, таблиц inode, экстентов и структуры директорий.
+   - **`ramfs`**: Файловая система в оперативной памяти, используемая для ранней стадии загрузки и распаковки `initrd`.
+   - **`devtmpfs`**: Автоматически регистрирует символьные и блочные устройства в `/dev` с точными номерами major:minor (`/dev/null` [1:3], `/dev/zero` [1:5], `/dev/tty0` [4:0], `/dev/sda` [8:0]).
+   - **`procfs`**: Псевдо-ФС ядра `/proc` для диагностики (`/proc/meminfo`, `/proc/cpuinfo`, `/proc/uptime`, `/proc/<pid>/status`).
+   - **`sysfs`**: Иерархия `/sys` для инспекции сетевых интерфейсов (`/sys/class/net/eth0`) и системных шин.
+   - **`tmpfs`**: Временные файловые системы в памяти для директорий `/tmp` и `/run`.
+   - **`pipefs` / `sockfs`**: Синтетические файлы для организации межпроцессных каналов (pipes) и сетевых сокетов.
 
 ---
 
-## 6. Security, DAC & Protection
+## 5. Сетевая подсистема
 
-1. **Discretionary Access Control (DAC)**:
-   - File permission bits (`rwxrwxrwx`, `suid`, `sgid`, sticky bit).
-   - Credential validation against real and effective IDs (`uid`, `gid`, `euid`, `egid`).
-   - Passwords securely hashed with SHA-512 crypt in `/etc/shadow` (read-restricted mode `0640`).
+```
+                 [ Приложения: wget / ping / sshd / nslookup ]
+                                       │
+                                       ▼
+                         [ Слой сокетов BSD Syscall ]
+                            (socket, connect, listen, ...)
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    ▼                                     ▼
+            [ Протокол TCP ]                      [ Протокол UDP ]
+       - 3-стороннее рукопожатие               - Датаграммы без установления
+       - Отслеживание SEQ и ACK                  соединения
+       - Управление скользящим окном           - Проверка контрольных сумм
+       - Завершение (FIN, TIME_WAIT)           - Поддержка DNS и DHCP
+                    └──────────────────┬──────────────────┘
+                                       │
+                                       ▼
+                                [ Протокол IPv4 ]
+                           - Маршрутизация пакетов
+                           - Контрольные суммы и TTL
+                           - Эхо-запросы ICMP Ping
+                                       │
+                                       ▼
+                                 [ Модуль ARP ]
+                           - Таблица соответствия IP/MAC
+                           - Обработка ARP-запросов и ответов
+                                       │
+                                       ▼
+                           [ Сетевой интерфейс netif ]
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    ▼                                     ▼
+             [ Intel e1000 ]                       [ VirtIO-Net ]
+```
 
-2. **Kernel Hardening**:
-   - **Stack Smashing Protection (Canaries)**: Kernel and userspace compiled with `-fstack-protector-strong`. Canary corruption immediately triggers `SIGABRT` / panic.
-   - **No-Execute (NX / XD Bit)**: Data, heap, and user stack pages are mapped with `PAGE_NX` enabled in PML4/PT. Code execution on stack generates immediate `#PF` and process termination by `SIGSEGV`.
-   - **Address Isolation**: Ring 3 user code cannot read or modify higher-half kernel memory pages.
+1. **Обработка сетевых пакетов**:
+   - Ядро использует дескрипторы сетевых буферов `struct net_buf`.
+   - Фоновый поток ядра обрабатывает входящие очереди кольцевых буферов сетевой карты.
+
+2. **Реализация протоколов**:
+   - **Ethernet и ARP**: Разбор фреймов 802.3, динамическая таблица сопоставления IP и MAC-адресов.
+   - **IPv4**: Проверка контрольных сумм, локальная доставка и отправка через шлюз по умолчанию.
+   - **ICMP**: Автоматические ответы ICMP Echo Reply на внешние ping-запросы; интерфейс сокетов ICMP для `/bin/ping`.
+   - **UDP**: Мультиплексирование датаграмм по номерам портов; обеспечивает работу клиентов DHCP и резолвера DNS.
+   - **TCP**: Полноценный автомат состояний протокола TCP:
+     - Установление соединения: 3-стороннее рукопожатие (`SYN` -> `SYN/ACK` -> `ACK`).
+     - Скользящее окно приёма и передачи (flow control).
+     - Генерация подтверждений (ACK) и отслеживание порядковых номеров.
+     - Корректное закрытие соединений (`FIN_WAIT`, `CLOSE_WAIT`, `TIME_WAIT`).
+     - Блокирующий и неблокирующий режимы сокетов.
+
+3. **Сетевые драйверы**:
+   - **Intel 82540EM (e1000)**: Опрос шины PCI, дескрипторы очередей передачи и приёма, вычисление аппаратных контрольных сумм.
+   - **VirtIO-Net**: Паравиртуализованный драйвер с использованием очередей virtqueue для максимальной скорости в гипервизорах.
+
+---
+
+## 6. Безопасность и разграничение доступа
+
+1. **Дискреционный контроль доступа (DAC)**:
+   - Стандартные биты прав доступа Unix (`rwxrwxrwx`, флаги `suid`, `sgid`, sticky bit).
+   - Проверка прав на уровне системных вызовов VFS по реальным и эффективным идентификаторам (`uid`, `gid`, `euid`, `egid`).
+   - Хеширование паролей пользователей надёжным алгоритмом SHA-512 crypt в `/etc/shadow` с правами доступа `0640`.
+
+2. **Защитные механизмы ядра**:
+   - **Защита от переполнения стека (Stack Canaries)**: Ядро и системные утилиты скомпилированы с опцией `-fstack-protector-strong`. Повреждение контрольного значения вызывает немедленный `SIGABRT` / `panic`.
+   - **Запрет исполнения данных (NX / XD бит)**: Страницы стека, кучи и данных помечаются битом `PAGE_NX`. Попытка передачи управления на пользовательский стек вызывает ошибку страницы `#PF` и завершение процесса по сигналу `SIGSEGV`.
+   - **Изоляция привилегий**: Код Ring 3 не имеет доступа к виртуальным адресам старшей половины ядра (`>= 0xFFFF800000000000`).

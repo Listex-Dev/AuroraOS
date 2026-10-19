@@ -1,23 +1,23 @@
-# AuroraOS Coding Style & Conventions
+# Стандарты кодирования и соглашения AuroraOS
 
-This document outlines the development conventions, code organization principles, and engineering invariants governing the **AuroraOS** codebase.
-
----
-
-## 1. Core Principles
-
-1. **Linux/Unix Philosophical Fidelity**: Never invent custom kernel abstractions when a proven standard exists (`inode`, `dentry`, `file_operations`, `major:minor`, `termios`, BSD sockets).
-2. **Defensive Error Handling**: User input or userspace program misbehavior must **never** cause a kernel panic. Always validate user pointers before dereferencing and return negative `-errno` values (`-EFAULT`, `-EINVAL`, `-EBADF`, `-ENOMEM`).
-3. **Monolithic Invariants**: Subsystems are modular in design but compiled directly into the kernel image for zero-overhead internal communication.
+В этом документе изложены правила оформления кода, принципы организации исходных файлов и инженерные инварианты, обязательные для кодовой базы **AuroraOS**.
 
 ---
 
-## 2. Formatting & Syntax
+## 1. Основные принципы
 
-1. **Indentation**: 4 spaces per indentation level. Avoid mixing tabs and spaces.
-2. **Line Length**: Soft limit of 100 characters; hard limit of 120 characters where readability is improved.
-3. **Braces**:
-   - Functions: opening brace on a new line:
+1. **Следование стандартам Linux/Unix**: Не изобретайте собственные абстракции, если существует проверенное временем решение (`inode`, `dentry`, `file_operations`, `major:minor`, `termios`, сокеты BSD).
+2. **Защитная обработка ошибок**: Ошибки пользовательского ввода или аварии в Ring 3 **никогда** не должны приводить к панике ядра (`panic`). Всегда валидируйте пользовательские указатели перед разыменованием и возвращайте отрицательные коды ошибок `-errno` (`-EFAULT`, `-EINVAL`, `-EBADF`, `-ENOMEM`).
+3. **Монолитная архитектура**: Подсистемы проектируются модульными, но компилируются непосредственно в образ ядра для максимальной производительности межмодульного взаимодействия.
+
+---
+
+## 2. Форматирование и синтаксис
+
+1. **Отступы**: 4 пробела на один уровень отступа. Не смешивайте табуляцию и пробелы.
+2. **Длина строк**: Желательное ограничение — 100 символов; предельное — 120 символов в случаях, когда это улучшает читаемость.
+3. **Фигурные скобки**:
+   - Определение функций: открывающая скобка на отдельной строке:
      ```c
      int vfs_open(const char *path, int flags, mode_t mode)
      {
@@ -26,7 +26,7 @@ This document outlines the development conventions, code organization principles
          ...
      }
      ```
-   - Control statements (`if`, `for`, `while`, `switch`): opening brace on the same line:
+   - Управляющие конструкции (`if`, `for`, `while`, `switch`): открывающая скобка на той же строке:
      ```c
      if (condition) {
          action();
@@ -34,64 +34,63 @@ This document outlines the development conventions, code organization principles
          alternative();
      }
      ```
-4. **Spacing**:
-   - One space after control keywords: `if (x)`, `for (int i = 0; ...)`, `while (running)`.
-   - No space between function name and parenthesis: `kmalloc(size)`, `printf("format\n")`.
-   - Pointer asterisk touches the variable name: `char *buf`, `struct task_struct *current`.
+4. **Пробелы**:
+   - Один пробел после управляющих ключевых слов: `if (x)`, `for (int i = 0; ...)`, `while (running)`.
+   - Без пробела между именем функции и открывающей круглой скобкой: `kmalloc(size)`, `printf("format\n")`.
+   - Звёздочка указателя примыкает к имени переменной: `char *buf`, `struct task_struct *current`.
 
 ---
 
-## 3. Naming Conventions
+## 3. Соглашения об именовании
 
-### Variables & Functions
-All identifiers use lowercase `snake_case`. Subsystem prefixes are strictly mandatory for globally scoped functions and symbols:
+### Переменные и функции
+Все идентификаторы записываются строчными буквами в стиле `snake_case`. Префиксы подсистем обязательны для глобальных функций и символов:
 
-| Subsystem | Prefix | Example |
+| Подсистема | Префикс | Пример |
 |---|---|---|
-| Physical Memory | `pmm_` | `pmm_alloc_page()`, `pmm_free_page()` |
-| Virtual Memory | `vmm_` | `vmm_map_page()`, `vmm_unmap_page()` |
-| Dynamic Heap | `heap_`, `kmalloc`, `kfree` | `kmalloc()`, `kfree()` |
-| Task & Scheduling | `sched_`, `task_` | `sched_yield()`, `task_create()` |
-| Virtual File System | `vfs_` | `vfs_mount()`, `vfs_read()`, `vfs_write()` |
-| ext4 Filesystem | `ext4_` | `ext4_mount()`, `ext4_read_inode()` |
-| Networking | `net_`, `tcp_`, `ip_`, `arp_` | `tcp_connect()`, `ip_send_packet()` |
-| System Calls | `sys_` | `sys_read()`, `sys_fork()`, `sys_syslog()` |
+| Физическая память | `pmm_` | `pmm_alloc_page()`, `pmm_free_page()` |
+| Виртуальная память | `vmm_` | `vmm_map_page()`, `vmm_unmap_page()` |
+| Динамическая куча | `heap_`, `kmalloc`, `kfree` | `kmalloc()`, `kfree()` |
+| Задачи и планировщик | `sched_`, `task_` | `sched_yield()`, `task_create()` |
+| Виртуальная ФС | `vfs_` | `vfs_mount()`, `vfs_read()`, `vfs_write()` |
+| Файловая система ext4 | `ext4_` | `ext4_mount()`, `ext4_read_inode()` |
+| Сетевой стек | `net_`, `tcp_`, `ip_`, `arp_` | `tcp_connect()`, `ip_send_packet()` |
+| Системные вызовы | `sys_` | `sys_read()`, `sys_fork()`, `sys_syslog()` |
 
-### Constants & Macros
-Use uppercase with underscores:
+### Константы и макросы
+Записываются заглавными буквами с подчёркиваниями:
 ```c
 #define PAGE_SIZE       4096
 #define MAX_TASKS       1024
 #define TCP_WINDOW_SIZE 65535
 ```
 
-### Typedefs & Structures
-Kernel internal structures are explicitly named with `struct`:
+### Структуры и типы данных
+Внутренние структуры ядра объявляются с ключевым словом `struct`:
 ```c
 struct task_struct;
 struct inode;
 struct dentry;
 struct net_buf;
 ```
-Userspace libc types use POSIX `_t` suffix: `pid_t`, `uid_t`, `gid_t`, `mode_t`, `off_t`, `size_t`.
+Пользовательские типы библиотеки libc используют суффикс `_t`: `pid_t`, `uid_t`, `gid_t`, `mode_t`, `off_t`, `size_t`.
 
 ---
 
-## 4. Error Handling & Invariants
+## 4. Обработка ошибок и инварианты
 
-1. **Kernel Internal Functions**: Return integer error codes (`0` on success, `< 0` on failure, e.g. `-ENOENT`, `-ENOMEM`).
-2. **Panic Usage**:
-   - `panic()` is strictly reserved for unrecoverable boot failures (e.g. inability to allocate initial PML4 page table) or corrupt CPU execution states.
-   - For all other situations, recover cleanly and propagate the error up the call stack.
-3. **Pointers from Ring 3**:
-   - Always verify user pointers before dereference.
-   - User buffers must reside in lower-half canonical memory (`< 0x0000800000000000`). Accessing kernel space from userspace triggers `-EFAULT`.
+1. **Внутренние функции ядра**: Возвращают целые числа (`0` при успешном завершении, `< 0` при ошибке, например `-ENOENT`, `-ENOMEM`).
+2. **Использование `panic()`**:
+   - Вызов `panic()` допускается исключительно при неустранимых сбоях на этапе начальной загрузки (например, невозможность выделить базовую таблицу страниц PML4) или критическом повреждении структур ядра.
+   - Во всех остальных случаях функция должна корректно обработать сбой и передать код ошибки вверх по стеку вызовов.
+3. **Указатели из Ring 3**:
+   - Обязательна предварительная проверка пользовательских указателей на попадание в канонический диапазон памяти (`< 0x0000800000000000`). Попытка передачи адресов пространства ядра немедленно возвращает ошибку `-EFAULT`.
 
 ---
 
-## 5. Header Guards & Modularity
+## 5. Защита заголовочных файлов
 
-Every header file must include standard preprocessor guards matching its relative repository path:
+Каждый заголовочный файл снабжается стандартным preprocessor guard, соответствующим пути к файлу:
 
 ```c
 #ifndef _AURORA_NET_TCP_H
@@ -100,19 +99,19 @@ Every header file must include standard preprocessor guards matching its relativ
 #include <stdint.h>
 #include <stddef.h>
 
-/* declarations */
+/* объявления функций и структур */
 
 #endif /* _AURORA_NET_TCP_H */
 ```
 
 ---
 
-## 6. Commit Message Guidelines
+## 6. Правила оформления коммитов
 
-AuroraOS follows Conventional Commits:
+В репозитории принят стандарт Conventional Commits:
 
-- `feat:` Adds a new user-facing or kernel subsystem capability.
-- `fix:` Fixes a bug or regressions in an existing component.
-- `refactor:` Code restructuring without functional changes.
-- `test:` Introduces or updates acceptance and unit test suites.
-- `docs:` Documentation improvements and specification updates.
+- `feat:` Добавление новой функциональности ядра или утилит.
+- `fix:` Исправление ошибки или устранение регрессии.
+- `refactor:` Рефакторинг кода без изменения внешней логики.
+- `test:` Добавление или обновление приёмочных и модульных тестов.
+- `docs:` Обновление документации или спецификации.

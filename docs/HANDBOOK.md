@@ -1,73 +1,73 @@
-# AuroraOS Administrator & User Handbook
+# Руководство администратора и пользователя AuroraOS
 
-Welcome to **AuroraOS**, a 64-bit Unix-like operating system conforming to POSIX standards, featuring an ext4 root filesystem, preemptive multitasking, a full BSD TCP/IP networking stack, a SysV init service architecture, and cryptographic package management.
+Добро пожаловать в **AuroraOS** — 64-битную Unix-подобную операционную систему, соответствующую стандартам POSIX, включающую файловую систему ext4, вытесняющую многозадачность, сетевой стек TCP/IP, архитектуру служб SysV init и защищённый менеджер пакетов.
 
 ---
 
-## 1. Booting & Login
+## 1. Загрузка и вход в систему
 
-### Bootstrapping
-When booting from QEMU or real hardware:
+### Старт системы
+При запуске в эмуляторе QEMU или на физическом оборудовании:
 ```bash
 make run
 ```
-The kernel initializes memory, CPU subsystems, mounts the ext4 root filesystem, and launches `init` (PID 1).
+Ядро инициализирует процессор, память и устройства, монтирует корневую файловую систему ext4 и передаёт управление процессу `init` (PID 1).
 
-`init` automatically spawns `getty` on the virtual console (`/dev/tty0`) and the serial console (`/dev/ttyS0`).
+`init` автоматически запускает процесс `getty` на виртуальной консоли (`/dev/tty0`) и на последовательном порту (`/dev/ttyS0`).
 
-### User Accounts & Credentials
-AuroraOS features multi-user security with shadow passwords:
+### Учётные записи пользователей
+AuroraOS поддерживает многопользовательский режим с защитой паролей в теневой базе shadow:
 
-| Username | Default Password | UID | Description |
+| Имя пользователя | Пароль по умолчанию | UID | Назначение |
 |---|---|---|---|
-| `root` | `root` | `0` | Superuser with unrestricted administrative access |
-| `aurora` | `aurora` | `1000` | Standard unprivileged user account |
+| `root` | `root` | `0` | Суперпользователь с неограниченными правами |
+| `aurora` | `aurora` | `1000` | Стандартная непривилегированная учётная запись |
 
-At the `aurora login:` prompt, enter your username and password.
+В строке приглашения `aurora login:` введите имя пользователя и соответствующий пароль.
 
-### Switching Users & Changing Passwords
-- Switch to another user:
+### Смена пользователя и проверка прав
+- Переключение на непривилегированного пользователя:
   ```bash
   su aurora
   ```
-- Switch to superuser (`root` password required):
+- Переключение в режим суперпользователя (требуется ввод пароля `root`):
   ```bash
   su -
   ```
-- Verify your current identity:
+- Просмотр текущих идентификаторов пользователя и групп:
   ```bash
   id
   ```
 
 ---
 
-## 2. Shell & Terminal Environment
+## 2. Командная оболочка и терминал
 
-### Virtual Consoles
-AuroraOS provides multiple virtual terminals (VT0 through VT5):
-- Switch between consoles using **Alt + F1** through **Alt + F6**.
-- Remote terminal emulation is available via PTYs (`/dev/pts/`).
+### Виртуальные консоли
+AuroraOS предоставляет несколько независимых виртуальных терминалов (VT0 — VT5):
+- Переключение между консолями осуществляется комбинациями клавиш **Alt + F1** — **Alt + F6**.
+- Для удалённых сессий выделяются динамические псевдотерминалы PTY (`/dev/pts/`).
 
-### Shell Features (`/bin/sh`)
-The system shell supports standard POSIX interactive capabilities:
-- **Pipelines**:
+### Возможности оболочки (`/bin/sh`)
+Командный интерпретатор поддерживает классические интерактивные возможности Unix:
+- **Конвейеры (Pipes)**:
   ```bash
   cat /etc/passwd | grep root
   ```
-- **I/O Redirection**:
+- **Перенаправление ввода и вывода**:
   ```bash
   echo "nameserver 10.0.2.3" > /etc/resolv.conf
   dmesg >> /var/log/dmesg.boot
   ```
-- **Job Control & Signals**:
-  - `Ctrl + C` sends `SIGINT` to terminate the active foreground process.
-  - `Ctrl + Z` sends `SIGTSTP` to suspend execution.
-  - Background processes using `&`:
+- **Управление заданиями и сигналы**:
+  - `Ctrl + C` отправляет сигнал `SIGINT` активному процессу переднего плана.
+  - `Ctrl + Z` отправляет сигнал `SIGTSTP` для приостановки задачи.
+  - Запуск задач в фоновом режиме через амперсанд `&`:
     ```bash
     sleep 10 &
     ```
-- **Scripting**:
-  Scripts starting with `#!/bin/sh` are executable directly:
+- **Исполнение скриптов**:
+  Файлы со строкой `#!/bin/sh` исполняются напрямую:
   ```bash
   chmod +x /etc/init.d/networking
   /etc/init.d/networking restart
@@ -75,29 +75,29 @@ The system shell supports standard POSIX interactive capabilities:
 
 ---
 
-## 3. Storage & Filesystem Administration
+## 3. Файловая система и диски
 
-### Directory Hierarchy (FHS 3.0)
-- `/bin`, `/sbin`: Core system binaries and administrator utilities.
-- `/etc`: Configuration files (`passwd`, `shadow`, `fstab`, `inittab`, `init.d/`).
-- `/dev`: Device nodes managed by `devtmpfs` (character and block devices).
-- `/proc`, `/sys`: Kernel synthetic diagnostic and hardware interfaces.
-- `/var`: Variable data, spool files, logs (`/var/log/`), and package DB (`/var/lib/pkg/`).
-- `/usr`: Secondary hierarchy for user tools, documentation, and manual pages.
-- `/tmp`: Temporary scratch directory.
+### Структура каталогов FHS 3.0
+- `/bin`, `/sbin`: Основные системные утилиты и команды администратора.
+- `/etc`: Файлы конфигурации (`passwd`, `shadow`, `fstab`, `inittab`, скрипты `init.d/`).
+- `/dev`: Узлы символьных и блочных устройств (`devtmpfs`).
+- `/proc`, `/sys`: Интерфейсы ядра для диагностики и параметров оборудования.
+- `/var`: Изменяемые данные, очереди, журналы (`/var/log/`) и база пакетов (`/var/lib/pkg/`).
+- `/usr`: Вторичная иерархия для пользовательских программ, библиотек и man-страниц.
+- `/tmp`: Каталог для временных файлов.
 
-### Disks and Partitions
-- Inspect partition table:
+### Работа с дисками и разделами
+- Просмотр таблицы разделов:
   ```bash
   fdisk -l /dev/sda
   ```
-- Mount and unmount partitions:
+- Монтирование и размонтирование файловых систем:
   ```bash
   mount /dev/sda2 /mnt
   ls -l /mnt
   umount /mnt
   ```
-- File permissions and ownership:
+- Управление правами доступа и владельцами:
   ```bash
   chmod 755 /usr/bin/myprog
   chown aurora:aurora /home/aurora/myfile
@@ -105,66 +105,66 @@ The system shell supports standard POSIX interactive capabilities:
 
 ---
 
-## 4. Network Configuration
+## 4. Настройка сети
 
-### Automated Setup (DHCP)
-To acquire an IP address automatically from the local DHCP server:
+### Автоматическая настройка (DHCP)
+Для получения IP-адреса, маски и шлюза от локального DHCP-сервера:
 ```bash
 dhclient eth0
 ```
 
-### Manual IP Configuration
-Inspect or assign IP addresses manually:
+### Ручная настройка IP-адреса
+Просмотр и ручное назначение параметров интерфейса:
 ```bash
-# View network interface status
+# Просмотр сетевых интерфейсов
 ifconfig
 
-# Set static IP and netmask
+# Назначение статического адреса
 ifconfig eth0 10.0.2.15 netmask 255.255.255.0 up
 ```
 
-### DNS & Connectivity
-- Test network connectivity:
+### Диагностика сети и загрузка файлов
+- Проверка сетевой связности:
   ```bash
   ping 10.0.2.2
   ```
-- Query domain names:
+- Запросы к службе DNS:
   ```bash
   nslookup example.com
   ```
-- Download files via HTTP:
+- Загрузка файлов по протоколу HTTP:
   ```bash
   wget http://10.0.2.2:8000/archive.tar
   ```
-- Inspect active TCP/UDP sockets:
+- Инспекция открытых портов и соединений TCP/UDP:
   ```bash
   netstat -an
   ```
 
-### Secure Shell (SSH) Remote Access
-AuroraOS runs an `sshd` daemon listening on port 22:
-- Connect from the host computer:
+### Удалённый доступ по SSH
+В системе работает служба `sshd`, принимающая подключения на 22 порту:
+- Подключение с хост-системы:
   ```bash
   ssh aurora@localhost -p 2222
   ```
-- Enter password `aurora`. The SSH session allocates a full pseudo-terminal (`pty`) supporting interactive terminal programs like `vi`.
+- Введите пароль `aurora`. Сессия SSH автоматически выделяет терминал PTY, обеспечивая поддержку интерактивных программ (включая редактор `vi`).
 
 ---
 
-## 5. System Services & SysV Init
+## 5. Системные службы и SysV Init
 
-The `init` daemon organizes system services through SysV runlevels:
+Процесс `init` управляет системными службами в соответствии с уровнями запуска SysV:
 
-| Runlevel | Purpose |
+| Уровень | Назначение |
 |---|---|
-| `0` | System Halt |
-| `1` | Single-user administrative recovery |
-| `2` | Multi-user without networking |
-| `3` | Full multi-user with networking, syslogd, crond, sshd (Default) |
-| `6` | System Reboot |
+| `0` | Остановка системы (Halt) |
+| `1` | Однопользовательский режим восстановления |
+| `2` | Многопользовательский режим без сетевых служб |
+| `3` | Полный многопользовательский режим с сетью и демонами (по умолчанию) |
+| `6` | Перезагрузка системы (Reboot) |
 
-### Managing Services
-Service control scripts reside in `/etc/init.d/`:
+### Управление службами
+Скрипты управления расположены в каталоге `/etc/init.d/`:
 
 ```bash
 /etc/init.d/syslogd {start|stop|restart|status}
@@ -173,89 +173,89 @@ Service control scripts reside in `/etc/init.d/`:
 /etc/init.d/networking {start|stop|restart|status}
 ```
 
-### Changing Runlevels
-Switch runlevels dynamically using `telinit`:
+### Переключение уровней выполнения
+Для динамической смены уровня используется утилита `telinit`:
 ```bash
-telinit 6    # Reboots the machine cleanly
-telinit 0    # Halts the system
+telinit 6    # Корректная перезагрузка системы
+telinit 0    # Остановка системы
 ```
 
 ---
 
-## 6. Logging, Kernel Buffer & Cron
+## 6. Журналирование, журнал ядра и планировщик cron
 
-### System Logging
-- Daemons log events via `syslog(3)` to the `syslogd` service.
-- Logs are preserved in `/var/log/messages` and `/var/log/auth.log`.
-- Send custom messages to syslog from shell scripts:
+### Журналирование событий
+- Демоны отправляют сообщения через системный вызов `syslog(3)` в службу `syslogd`.
+- Сообщения сохраняются в файлах `/var/log/messages` и `/var/log/auth.log`.
+- Запись сообщений в системный журнал из шелл-скриптов:
   ```bash
-  logger -t myscript "Operation finished successfully"
+  logger -t myscript "Операция успешно завершена"
   ```
 
-### Kernel Message Buffer (`dmesg`)
-Examine kernel boot messages and hardware driver status:
+### Просмотр журнала ядра (`dmesg`)
+Для вывода сообщений кольцевого буфера ядра и статусов устройств:
 ```bash
 dmesg
 ```
 
-### Periodic Task Scheduler (`crond`)
-- View scheduled cron jobs for current user:
+### Планировщик периодических задач (`crond`)
+- Просмотр списка задач текущего пользователя:
   ```bash
   crontab -l
   ```
-- Edit user cron table:
+- Редактирование пользовательской таблицы cron:
   ```bash
   crontab -e
   ```
-- Global system schedule is configured in `/etc/crontab`.
+- Общесистемное расписание настраивается в файле `/etc/crontab`.
 
 ---
 
-## 7. Package Management (`pkg`)
+## 7. Управление пакетами (`pkg`)
 
-AuroraOS includes a package manager (`/bin/pkg`) with cryptographic HMAC-SHA256 signature verification:
+Пакетный менеджер `/bin/pkg` управляет архивами программ с проверкой цифровой подписи HMAC-SHA256:
 
 ```bash
-# Install a signed package
+# Установка пакета с проверкой подписи
 pkg install /packages/sample.aurpkg
 
-# List all installed packages
+# Список установленных в системе пакетов
 pkg list
 
-# Display detailed package metadata
+# Подробная информация о пакете
 pkg info sample
 
-# Remove an installed package
+# Удаление пакета
 pkg remove sample
 
-# Verify integrity and upgrade all system packages
+# Проверка целостности и обновление всех пакетов
 pkg upgrade-system
 ```
 
 ---
 
-## 8. Manual Pages & Documentation
+## 8. Справочные страницы и документация
 
-System manuals are accessible directly on the console:
+Встроенная справочная система доступна напрямую из терминала:
 
 ```bash
-# Commands (Section 1)
+# Пользовательские команды (Раздел 1)
 man ls
 man sh
 man pkg
 man dmesg
 
-# File formats (Section 5)
+# Форматы конфигурационных файлов (Раздел 5)
 man 5 passwd
 man 5 shadow
 
-# System administration (Section 8)
+# Утилиты системного администрирования (Раздел 8)
 man 8 syslogd
 man 8 crond
 man 8 sshd
 ```
 
-Additional documentation files are located in `/usr/share/doc/aurora/`:
+Дополнительные текстовые файлы документации размещены в `/usr/share/doc/aurora/`:
 - `HANDBOOK.txt`
 - `ABI.txt`
 - `PORTING.txt`
