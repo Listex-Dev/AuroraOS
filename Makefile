@@ -94,7 +94,8 @@ C_SRCS  := kernel/main.c \
            kernel/proc/m15_test.c \
            kernel/proc/m16_test.c \
            kernel/fs/docs.c \
-           kernel/proc/m17_test.c
+           kernel/proc/m17_test.c \
+           kernel/proc/m18_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -154,7 +155,9 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/test_m16 \
               $(BUILD_DIR)/bin/pkg \
               $(BUILD_DIR)/bin/man \
-              $(BUILD_DIR)/bin/test_m17
+              $(BUILD_DIR)/bin/test_m17 \
+              $(BUILD_DIR)/bin/dmesg \
+              $(BUILD_DIR)/bin/test_m18
 
 .PHONY: all kernel run run-term debug test clean ssh
 
@@ -250,13 +253,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M17 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M18 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M17 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M18 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M17 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M18 verification failed! <<<"; \
 		exit 1; \
 	fi
 

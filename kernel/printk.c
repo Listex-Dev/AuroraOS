@@ -9,10 +9,20 @@ struct fmt_stream {
     bool    to_serial;
 };
 
+#define KMSG_RING_SIZE 32768
+static char g_kmsg_ring[KMSG_RING_SIZE];
+static size_t g_kmsg_head = 0;
+static size_t g_kmsg_total = 0;
+
 static void stream_putc(struct fmt_stream *s, char c)
 {
     if (s->to_serial) {
         serial_putchar(c);
+        g_kmsg_ring[g_kmsg_head] = c;
+        g_kmsg_head = (g_kmsg_head + 1) % KMSG_RING_SIZE;
+        if (g_kmsg_total < KMSG_RING_SIZE) {
+            g_kmsg_total++;
+        }
         s->count++;
     } else {
         if (s->buf && s->size > 0 && s->count + 1 < s->size) {
@@ -20,6 +30,25 @@ static void stream_putc(struct fmt_stream *s, char c)
         }
         s->count++;
     }
+}
+
+int64_t sys_syslog(int type, char *buf, int len)
+{
+    /* 10: SYSLOG_ACTION_SIZE_BUFFER */
+    if (type == 10) {
+        return (int64_t)g_kmsg_total;
+    }
+    /* 2: READ, 3: READ_ALL */
+    if (type == 2 || type == 3) {
+        if (!buf || len <= 0) return -22; /* -EINVAL */
+        size_t to_copy = (g_kmsg_total < (size_t)len) ? g_kmsg_total : (size_t)len;
+        size_t start = (g_kmsg_total == KMSG_RING_SIZE) ? g_kmsg_head : 0;
+        for (size_t i = 0; i < to_copy; i++) {
+            buf[i] = g_kmsg_ring[(start + i) % KMSG_RING_SIZE];
+        }
+        return (int64_t)to_copy;
+    }
+    return 0;
 }
 
 static void stream_puts(struct fmt_stream *s, const char *str)

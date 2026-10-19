@@ -92,6 +92,8 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_getuid();
         case SYS_getgid:
             return sys_getgid();
+        case SYS_syslog:
+            return sys_syslog((int)a1, (char *)a2, (int)a3);
         case SYS_geteuid:
             return sys_geteuid();
         case SYS_getegid:

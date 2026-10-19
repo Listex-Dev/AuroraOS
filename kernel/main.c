@@ -45,6 +45,7 @@
 #include <aurora/proc/m15_test.h>
 #include <aurora/proc/m16_test.h>
 #include <aurora/proc/m17_test.h>
+#include <aurora/proc/m18_test.h>
 #include <aurora/fs/docs.h>
 #include <aurora/net/dhcp.h>
 #include <aurora/net/netdev.h>
@@ -399,6 +400,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
         test_m15_security_subsystem();
         test_m16_services_subsystem();
         test_m17_package_and_docs_subsystem();
+        test_m18_final_system_verification();
     } else {
         /* Interactive Production Boot: initialize drivers and start PID 1 */
         pci_init();

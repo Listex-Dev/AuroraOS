@@ -46,6 +46,7 @@
 #define SYS_fchmod     91
 #define SYS_umask      95
 #define SYS_getuid     102
+#define SYS_syslog     103
 #define SYS_getgid     104
 #define SYS_setuid     105
 #define SYS_setgid     106
@@ -109,6 +110,7 @@ int64_t sys_getcwd(char *buf, size_t size);
 int64_t sys_uname(struct utsname *buf);
 int64_t sys_nanosleep(const struct timespec *req, struct timespec *rem);
 int64_t sys_pipe(int pipefd[2]);
+int64_t sys_syslog(int type, char *buf, int len);
 int64_t sys_setpgid(pid_t pid, pid_t pgid);
 int64_t sys_getpgrp(void);
 int64_t sys_setsid(void);

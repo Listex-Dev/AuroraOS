@@ -45,6 +45,8 @@
 .global bin_pkg_start, bin_pkg_end
 .global bin_man_start, bin_man_end
 .global bin_test_m17_start, bin_test_m17_end
+.global bin_dmesg_start, bin_dmesg_end
+.global bin_test_m18_start, bin_test_m18_end
 .global pkg_sample_start, pkg_sample_end
 .global pkg_sample_corrupt_start, pkg_sample_corrupt_end
 
@@ -257,6 +259,16 @@ bin_man_end:
 bin_test_m17_start:
     .incbin "build/bin/test_m17"
 bin_test_m17_end:
+
+.align 16
+bin_dmesg_start:
+    .incbin "build/bin/dmesg"
+bin_dmesg_end:
+
+.align 16
+bin_test_m18_start:
+    .incbin "build/bin/test_m18"
+bin_test_m18_end:
 
 .align 16
 pkg_sample_start:

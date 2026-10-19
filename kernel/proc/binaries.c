@@ -43,6 +43,8 @@ extern char bin_test_m16_start[], bin_test_m16_end[];
 extern char bin_pkg_start[],      bin_pkg_end[];
 extern char bin_man_start[],      bin_man_end[];
 extern char bin_test_m17_start[], bin_test_m17_end[];
+extern char bin_dmesg_start[],    bin_dmesg_end[];
+extern char bin_test_m18_start[], bin_test_m18_end[];
 
 struct binary_entry {
     const char *path;
@@ -112,6 +114,9 @@ static const struct binary_entry builtin_table[] = {
     { "/bin/man",      bin_man_start,      bin_man_end,      0755,  0, 0 },
     { "/usr/bin/man",  bin_man_start,      bin_man_end,      0755,  0, 0 },
     { "/bin/test_m17", bin_test_m17_start, bin_test_m17_end, 0755,  0, 0 },
+    { "/bin/dmesg",    bin_dmesg_start,    bin_dmesg_end,    0755,  0, 0 },
+    { "/usr/bin/dmesg",bin_dmesg_start,    bin_dmesg_end,    0755,  0, 0 },
+    { "/bin/test_m18", bin_test_m18_start, bin_test_m18_end, 0755,  0, 0 },
     { NULL, NULL, NULL, 0, 0, 0 }
 };
 

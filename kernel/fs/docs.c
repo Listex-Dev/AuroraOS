@@ -262,6 +262,60 @@ void docs_and_pkg_subsys_init(void)
                "SEE ALSO\n"
                "    netstat(1), ping(1)\n", 0644);
 
+    write_file("/usr/share/man/man1/dmesg.1",
+               "NAME\n"
+               "    dmesg - print or control the kernel ring buffer\n\n"
+               "SYNOPSIS\n"
+               "    dmesg\n\n"
+               "DESCRIPTION\n"
+               "    dmesg is used to examine or control the kernel ring buffer.\n\n"
+               "SEE ALSO\n"
+               "    syslogd(8)\n", 0644);
+
+    /* 5. System Documentation */
+    sys_mkdir("/usr/share/doc", 0755);
+    sys_mkdir("/usr/share/doc/aurora", 0755);
+
+    write_file("/usr/share/doc/aurora/HANDBOOK.txt",
+               "AuroraOS 1.0.0 System Handbook\n"
+               "=============================\n\n"
+               "1. System Architecture\n"
+               "AuroraOS is a modern monolithic POSIX-compatible operating system for x86-64 long mode.\n"
+               "All system abstractions follow standard Unix principles: everything is a file,\n"
+               "virtual filesystems (/proc, /sys, /dev, /tmp), and ring-3 processes with fast syscall gate.\n\n"
+               "2. Process Management\n"
+               "Full fork/execve/wait4 lifecycle with signals, job control, and zombie reaping.\n\n"
+               "3. Package Management\n"
+               "Managed via pkg with cryptographic HMAC-SHA256 signatures and /var/lib/pkg/db.\n\n"
+               "4. Services & Daemons\n"
+               "SysV service framework under /etc/init.d/ managing syslogd, crond, networking, and sshd.\n",
+               0644);
+
+    write_file("/usr/share/doc/aurora/ABI.txt",
+               "AuroraOS System Call ABI Specification\n"
+               "======================================\n\n"
+               "Architecture: x86-64 (AMD64 Long Mode)\n"
+               "Instruction: syscall / sysretq\n\n"
+               "Registers:\n"
+               "  Syscall Number:  RAX\n"
+               "  Argument 1:      RDI\n"
+               "  Argument 2:      RSI\n"
+               "  Argument 3:      RDX\n"
+               "  Argument 4:      R10\n"
+               "  Argument 5:      R8\n"
+               "  Argument 6:      R9\n"
+               "  Return Value:    RAX (>=0 success, -errno on error)\n",
+               0644);
+
+    write_file("/usr/share/doc/aurora/PORTING.txt",
+               "AuroraOS Application Porting Guide\n"
+               "==================================\n\n"
+               "1. Runtime:\n"
+               "AuroraOS libc provides POSIX unistd, stdio, stdlib, dirent, termios, signal, sha256.\n\n"
+               "2. Binary Format:\n"
+               "ELF64 static or dynamic executables loaded via ELF PT_LOAD segments.\n",
+               0644);
+
     /* 5. Deploy test packages to /packages/ */
     size_t sample_sz = (size_t)(pkg_sample_end - pkg_sample_start);
     if (sample_sz > 0) {
