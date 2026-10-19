@@ -1094,7 +1094,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 | **M14** | DHCP, DNS, `ifconfig`, `netstat`, `wget`, `pty` | `wget http://...` качает файл через DHCP-адрес | `[x]` |
 | **M15** | Безопасность: `passwd/shadow/group`, `su`, `login`, `umask`, `setuid`, NX, stack canaries | Вход по паролю; `su aurora` меняет UID; canary ловит переполнение | `[x]` |
 | **M16** | Службы: `syslogd`, `crond`, `networking`, `sshd`, `init.d`, уровни | `sshd` принимает подключение с хоста; `crond` запускает задачу | `[x]` |
-| **M17** | `pkg` + подпись + `/var/lib/pkg`, `man`-страницы для всех команд | `pkg install X` ставит и `man X` работает | `[ ]` |
+| **M17** | `pkg` + подпись + `/var/lib/pkg`, `man`-страницы для всех команд | `pkg install X` ставит и `man X` работает | `[x]` |
 | **M18** | Тесты (unit/integration/posix), документация, `dmesg`, стабильность 24 ч | Прогон `make test` — 100 % зелёных; аптайм 24 ч без паники | `[ ]` |
 
 **Оценка объёма:** ~60–80 тыс. строк C + ~5 тыс. строк ассемблера + ~10 тыс. строк скриптов/документации.
@@ -1132,7 +1132,7 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 - [x] `netstat -an` показывает сокеты в правильных состояниях.
 
 ### 19.5 Оболочка и утилиты
-- [ ] Все утилиты из 11.4 присутствуют, имеют `man`-страницу, возвращают корректные коды.
+- [x] Все утилиты из 11.4 присутствуют, имеют `man`-страницу, возвращают корректные коды.
 - [ ] `sh -c 'cat /etc/passwd | grep root | wc -l'` → `1`.
 - [ ] `vi` полностью функционален в raw-режиме: создание, редактирование, сохранение.
 - [x] Скрипт `/etc/init.d/` исполняется оболочкой без ошибок.
@@ -1145,8 +1145,8 @@ gdb -q build/aurora.elf -ex 'target remote :1234' -ex 'continue'
 - [x] `mmap(PROT_WRITE|PROT_EXEC)` вне явного запроса невозможен; NX активен.
 
 ### 19.7 Пакеты и службы
-- [ ] `pkg install` / `remove` / `upgrade-system` — атомарно, с проверкой подписи.
-- [ ] Подделанный пакет отклоняется с `EACCES`/ошибкой подписи.
+- [x] `pkg install` / `remove` / `upgrade-system` — атомарно, с проверкой подписи.
+- [x] Подделанный пакет отклоняется с `EACCES`/ошибкой подписи.
 - [x] `syslogd` пишет в `/var/log/messages`; `crond` выполняет задачу по расписанию; всё стартует автоматически.
 
 ### 19.8 Стабильность
@@ -1356,7 +1356,7 @@ reboot: System halted
 [x] M14 DHCP, DNS, ifconfig, netstat, wget, pty
 [x] M15 passwd/shadow/group, su, login, umask, setuid, NX, canaries
 [x] M16 syslogd, crond, networking, sshd, init.d, runlevels
-[ ] M17 pkg + подписи + man-страницы
+[x] M17 pkg + подписи + man-страницы
 [ ] M18 тесты, документация, 24h стабильность
 ```
 

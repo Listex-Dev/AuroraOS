@@ -92,7 +92,9 @@ C_SRCS  := kernel/main.c \
            kernel/net/m13_test.c \
            kernel/net/m14_test.c \
            kernel/proc/m15_test.c \
-           kernel/proc/m16_test.c
+           kernel/proc/m16_test.c \
+           kernel/fs/docs.c \
+           kernel/proc/m17_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -149,7 +151,10 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/telinit \
               $(BUILD_DIR)/bin/touch \
               $(BUILD_DIR)/bin/echo \
-              $(BUILD_DIR)/bin/test_m16
+              $(BUILD_DIR)/bin/test_m16 \
+              $(BUILD_DIR)/bin/pkg \
+              $(BUILD_DIR)/bin/man \
+              $(BUILD_DIR)/bin/test_m17
 
 .PHONY: all kernel run run-term debug test clean ssh
 
@@ -245,13 +250,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M16 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M17 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M16 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M17 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M16 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M17 verification failed! <<<"; \
 		exit 1; \
 	fi
 

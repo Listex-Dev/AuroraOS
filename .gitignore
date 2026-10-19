@@ -4,3 +4,6 @@ build/
 *.elf
 *.img
 *.iso
+tools/aurora-ssh
+tools/pkg-build
+

@@ -40,6 +40,9 @@ extern char bin_telinit_start[],  bin_telinit_end[];
 extern char bin_touch_start[],    bin_touch_end[];
 extern char bin_echo_start[],     bin_echo_end[];
 extern char bin_test_m16_start[], bin_test_m16_end[];
+extern char bin_pkg_start[],      bin_pkg_end[];
+extern char bin_man_start[],      bin_man_end[];
+extern char bin_test_m17_start[], bin_test_m17_end[];
 
 struct binary_entry {
     const char *path;
@@ -104,6 +107,11 @@ static const struct binary_entry builtin_table[] = {
     { "/bin/echo",     bin_echo_start,     bin_echo_end,     0755,  0, 0 },
     { "/usr/bin/echo", bin_echo_start,     bin_echo_end,     0755,  0, 0 },
     { "/bin/test_m16", bin_test_m16_start, bin_test_m16_end, 0755,  0, 0 },
+    { "/bin/pkg",      bin_pkg_start,      bin_pkg_end,      0755,  0, 0 },
+    { "/usr/bin/pkg",  bin_pkg_start,      bin_pkg_end,      0755,  0, 0 },
+    { "/bin/man",      bin_man_start,      bin_man_end,      0755,  0, 0 },
+    { "/usr/bin/man",  bin_man_start,      bin_man_end,      0755,  0, 0 },
+    { "/bin/test_m17", bin_test_m17_start, bin_test_m17_end, 0755,  0, 0 },
     { NULL, NULL, NULL, 0, 0, 0 }
 };
 

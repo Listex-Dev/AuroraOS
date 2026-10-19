@@ -42,6 +42,11 @@
 .global bin_touch_start, bin_touch_end
 .global bin_echo_start, bin_echo_end
 .global bin_test_m16_start, bin_test_m16_end
+.global bin_pkg_start, bin_pkg_end
+.global bin_man_start, bin_man_end
+.global bin_test_m17_start, bin_test_m17_end
+.global pkg_sample_start, pkg_sample_end
+.global pkg_sample_corrupt_start, pkg_sample_corrupt_end
 
 .align 16
 bin_hello_start:
@@ -237,4 +242,29 @@ bin_echo_end:
 bin_test_m16_start:
     .incbin "build/bin/test_m16"
 bin_test_m16_end:
+
+.align 16
+bin_pkg_start:
+    .incbin "build/bin/pkg"
+bin_pkg_end:
+
+.align 16
+bin_man_start:
+    .incbin "build/bin/man"
+bin_man_end:
+
+.align 16
+bin_test_m17_start:
+    .incbin "build/bin/test_m17"
+bin_test_m17_end:
+
+.align 16
+pkg_sample_start:
+    .incbin "build/packages/sample.aurpkg"
+pkg_sample_end:
+
+.align 16
+pkg_sample_corrupt_start:
+    .incbin "build/packages/sample-corrupt.aurpkg"
+pkg_sample_corrupt_end:
 

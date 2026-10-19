@@ -44,6 +44,8 @@
 #include <aurora/net/m14_test.h>
 #include <aurora/proc/m15_test.h>
 #include <aurora/proc/m16_test.h>
+#include <aurora/proc/m17_test.h>
+#include <aurora/fs/docs.h>
 #include <aurora/net/dhcp.h>
 #include <aurora/net/netdev.h>
 #include <aurora/net/arp.h>
@@ -241,6 +243,7 @@ void services_subsys_init(void)
 static void launch_init_process(void)
 {
     services_subsys_init();
+    docs_and_pkg_subsys_init();
 
     /* Allocate address space for PID 1 */
     uintptr_t pml4_phys = pmm_alloc_page();
@@ -395,6 +398,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
         test_m14_services_and_pty_subsystem();
         test_m15_security_subsystem();
         test_m16_services_subsystem();
+        test_m17_package_and_docs_subsystem();
     } else {
         /* Interactive Production Boot: initialize drivers and start PID 1 */
         pci_init();
