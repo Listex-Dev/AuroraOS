@@ -9,6 +9,8 @@
 #include <aurora/printk.h>
 #include <aurora/errno.h>
 #include <aurora/drivers/block.h>
+#include <aurora/net/netdev.h>
+#include <aurora/net/arp.h>
 
 struct proc_node {
     proc_read_fn generator;
@@ -201,6 +203,66 @@ static ssize_t gen_self_cmdline(char *buf, size_t max_len)
     return snprintf(buf, max_len, "%s\n", curr ? curr->comm : "unknown");
 }
 
+static ssize_t gen_net_dev(char *buf, size_t max_len)
+{
+    size_t off = 0;
+    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
+                    "Inter-|   Receive                                                |  Transmit\n"
+                    " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n");
+
+    for (struct netdev *dev = netdev_get_list(); dev != NULL; dev = dev->next) {
+        off += snprintf(buf + off, max_len > off ? max_len - off : 0,
+                        "%6s: %8llu %7llu %4llu %4llu    0     0          0         0 %8llu %7llu %4llu %4llu     0     0       0          0\n",
+                        dev->name,
+                        dev->stats.rx_bytes, dev->stats.rx_packets, dev->stats.rx_errors, dev->stats.rx_dropped,
+                        dev->stats.tx_bytes, dev->stats.tx_packets, dev->stats.tx_errors, dev->stats.tx_dropped);
+    }
+    return (ssize_t)off;
+}
+
+static ssize_t gen_net_arp(char *buf, size_t max_len)
+{
+    size_t off = 0;
+    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
+                    "IP address       HW type     Flags       HW address            Mask     Device\n");
+
+    const struct arp_entry *table = arp_get_table();
+    if (table) {
+        for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+            if (table[i].valid) {
+                uint32_t ip = net_ntohl(table[i].ip);
+                off += snprintf(buf + off, max_len > off ? max_len - off : 0,
+                                "%u.%u.%u.%u      0x1         0x%x         %02x:%02x:%02x:%02x:%02x:%02x     *        eth0\n",
+                                (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF,
+                                table[i].flags,
+                                table[i].mac[0], table[i].mac[1], table[i].mac[2],
+                                table[i].mac[3], table[i].mac[4], table[i].mac[5]);
+            }
+        }
+    }
+    return (ssize_t)off;
+}
+
+static ssize_t gen_net_route(char *buf, size_t max_len)
+{
+    return snprintf(buf, max_len,
+                    "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n"
+                    "eth0\t0002000A\t0202000A\t0003\t0\t0\t0\t00FFFFFF\t0\t0\t0\n"
+                    "lo\t0000007F\t00000000\t0001\t0\t0\t0\t000000FF\t0\t0\t0\n");
+}
+
+static ssize_t gen_net_tcp(char *buf, size_t max_len)
+{
+    return snprintf(buf, max_len,
+                    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+}
+
+static ssize_t gen_net_udp(char *buf, size_t max_len)
+{
+    return snprintf(buf, max_len,
+                    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+}
+
 static void create_proc_file(struct super_block *sb, struct dentry *parent, const char *name, proc_read_fn fn)
 {
     struct inode *inode = inode_alloc(sb);
@@ -264,6 +326,20 @@ struct super_block *procfs_create(void)
         if (self_dentry) {
             create_proc_file(sb, self_dentry, "status", gen_self_status);
             create_proc_file(sb, self_dentry, "cmdline", gen_self_cmdline);
+        }
+    }
+
+    /* /proc/net directory */
+    struct inode *net_dir_inode = inode_alloc(sb);
+    if (net_dir_inode) {
+        net_dir_inode->i_mode = S_IFDIR | 0555;
+        struct dentry *net_dentry = dentry_create("net", root_dentry, net_dir_inode);
+        if (net_dentry) {
+            create_proc_file(sb, net_dentry, "dev", gen_net_dev);
+            create_proc_file(sb, net_dentry, "arp", gen_net_arp);
+            create_proc_file(sb, net_dentry, "route", gen_net_route);
+            create_proc_file(sb, net_dentry, "tcp", gen_net_tcp);
+            create_proc_file(sb, net_dentry, "udp", gen_net_udp);
         }
     }
 

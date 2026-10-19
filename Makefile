@@ -75,7 +75,19 @@ C_SRCS  := kernel/main.c \
            kernel/drivers/m9_test.c \
            kernel/proc/m10_test.c \
            kernel/proc/m11_test.c \
-           kernel/drivers/m12_test.c
+           kernel/drivers/m12_test.c \
+           kernel/net/netbuf.c \
+           kernel/net/netdev.c \
+           kernel/net/loopback.c \
+           kernel/net/ethernet.c \
+           kernel/net/arp.c \
+           kernel/net/ipv4.c \
+           kernel/net/icmp.c \
+           kernel/net/udp.c \
+           kernel/net/tcp.c \
+           kernel/net/socket.c \
+           kernel/drivers/net/e1000.c \
+           kernel/net/m13_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -111,9 +123,11 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/mknod \
               $(BUILD_DIR)/bin/fdisk \
               $(BUILD_DIR)/bin/mount \
-              $(BUILD_DIR)/bin/test_m12
+              $(BUILD_DIR)/bin/test_m12 \
+              $(BUILD_DIR)/bin/ping \
+              $(BUILD_DIR)/bin/test_m13
 
-.PHONY: all kernel run debug test clean
+.PHONY: all kernel run run-term debug test clean
 
 all: kernel
 
@@ -156,15 +170,26 @@ $(BUILD_DIR)/%.o: %.S
 	@$(AS) $(ASFLAGS) $< -o $@
 
 run: $(TARGET_BIN) $(DISK_IMG)
-	@echo "Starting AuroraOS in QEMU..."
+	@echo "Starting AuroraOS in QEMU GUI..."
 	qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
+		-netdev user,id=net0 -device e1000,netdev=net0 \
 		-serial mon:stdio \
 		-vga std \
-		-no-reboot -no-shutdown 
+		-no-reboot -no-shutdown
 
+run-term: $(TARGET_BIN) $(DISK_IMG)
+	@echo "Starting AuroraOS in terminal mode (press Ctrl-A X to exit QEMU)..."
+	qemu-system-x86_64 \
+		-machine q35 -m 512M -smp 1 \
+		-kernel $(TARGET_BIN) \
+		-drive file=$(DISK_IMG),format=raw,if=ide \
+		-netdev user,id=net0 -device e1000,netdev=net0 \
+		-nographic \
+		-serial mon:stdio \
+		-no-reboot -no-shutdown
 
 debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 	@echo "Starting AuroraOS in debug mode (GDB port :1234)..."
@@ -172,6 +197,7 @@ debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 		-machine q35 -m 512M -smp 1 \
 		-kernel $(TARGET_BIN) \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
+		-netdev user,id=net0 -device e1000,netdev=net0 \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown \
@@ -179,21 +205,22 @@ debug: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 
 test: $(TARGET_BIN) $(DISK_IMG)
 	@echo "Running Milestone automated acceptance test..."
-	@output=$$(timeout 12s qemu-system-x86_64 \
+	@output=$$(timeout 15s qemu-system-x86_64 \
 		-machine q35 -m 512M -smp 1 \
-		-kernel $(TARGET_BIN) \
+		-kernel $(TARGET_BIN) -append "test" \
 		-drive file=$(DISK_IMG),format=raw,if=ide \
+		-netdev user,id=net0 -device e1000,netdev=net0 \
 		-serial stdio \
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M12 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M13 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M12 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M13 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M12 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M13 verification failed! <<<"; \
 		exit 1; \
 	fi
 

@@ -18,6 +18,7 @@ static void vt_tty_write_out(struct tty *tty, const char *buf, size_t count)
 {
     int vt_num = (tty->index == 0) ? vt_get_active() : (tty->index - 1);
     vt_write(vt_num, buf, count);
+    serial_write(buf, count);
 }
 
 static void serial_tty_write_out(struct tty *tty, const char *buf, size_t count)
@@ -330,7 +331,13 @@ static ssize_t tty_read(struct file *file, void *buf, size_t count, uint64_t *po
             if (file->f_flags & O_NONBLOCK) {
                 return -EAGAIN;
             }
-            break; /* Non-blocking return for now in kernel environment */
+            if (serial_has_rx()) {
+                char sc = serial_getc();
+                if (sc == '\r') sc = '\n';
+                tty_input_char(tty, sc);
+                continue;
+            }
+            sched_yield();
         }
     }
 

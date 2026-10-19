@@ -62,6 +62,8 @@ void pic_clear_mask(uint8_t irq)
     if (irq < 8) {
         port = PIC1_DATA;
     } else {
+        /* Unmask cascade line (IRQ 2) on master PIC */
+        outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << 2));
         port = PIC2_DATA;
         irq -= 8;
     }

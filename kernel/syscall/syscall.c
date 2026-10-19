@@ -2,6 +2,7 @@
 #include <aurora/arch/x86_64/msr.h>
 #include <aurora/arch/x86_64/interrupts.h>
 #include <aurora/proc/sched.h>
+#include <aurora/net/socket.h>
 #include <aurora/errno.h>
 #include <aurora/printk.h>
 
@@ -26,8 +27,6 @@ static void int80_handler(interrupt_frame_t *frame)
 
 int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6)
 {
-    (void)a5; (void)a6;
-
     switch (num) {
         case SYS_read:
             return sys_read((int)a1, (void *)a2, (size_t)a3);
@@ -53,6 +52,30 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_dup2((int)a1, (int)a2);
         case SYS_nanosleep:
             return sys_nanosleep((const struct timespec *)a1, (struct timespec *)a2);
+        case SYS_socket:
+            return sys_socket((int)a1, (int)a2, (int)a3);
+        case SYS_connect:
+            return sys_connect((int)a1, (const struct sockaddr *)a2, (socklen_t)a3);
+        case SYS_accept:
+            return sys_accept((int)a1, (struct sockaddr *)a2, (socklen_t *)a3);
+        case SYS_sendto:
+            return sys_sendto((int)a1, (const void *)a2, (size_t)a3, (int)a4, (const struct sockaddr *)a5, (socklen_t)a6);
+        case SYS_recvfrom:
+            return sys_recvfrom((int)a1, (void *)a2, (size_t)a3, (int)a4, (struct sockaddr *)a5, (socklen_t *)a6);
+        case SYS_shutdown:
+            return sys_shutdown((int)a1, (int)a2);
+        case SYS_bind:
+            return sys_bind((int)a1, (const struct sockaddr *)a2, (socklen_t)a3);
+        case SYS_listen:
+            return sys_listen((int)a1, (int)a2);
+        case SYS_getsockname:
+            return sys_getsockname((int)a1, (struct sockaddr *)a2, (socklen_t *)a3);
+        case SYS_getpeername:
+            return sys_getpeername((int)a1, (struct sockaddr *)a2, (socklen_t *)a3);
+        case SYS_setsockopt:
+            return sys_setsockopt((int)a1, (int)a2, (int)a3, (const void *)a4, (socklen_t)a5);
+        case SYS_getsockopt:
+            return sys_getsockopt((int)a1, (int)a2, (int)a3, (void *)a4, (socklen_t *)a5);
         case SYS_mkdir:
             return sys_mkdir((const char *)a1, (mode_t)a2);
         case SYS_rmdir:

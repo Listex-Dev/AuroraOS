@@ -21,6 +21,8 @@
 .global bin_fdisk_start, bin_fdisk_end
 .global bin_mount_start, bin_mount_end
 .global bin_test_m12_start, bin_test_m12_end
+.global bin_ping_start, bin_ping_end
+.global bin_test_m13_start, bin_test_m13_end
 
 .align 16
 bin_hello_start:
@@ -111,3 +113,13 @@ bin_mount_end:
 bin_test_m12_start:
     .incbin "build/bin/test_m12"
 bin_test_m12_end:
+
+.align 16
+bin_ping_start:
+    .incbin "build/bin/ping"
+bin_ping_end:
+
+.align 16
+bin_test_m13_start:
+    .incbin "build/bin/test_m13"
+bin_test_m13_end:

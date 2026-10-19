@@ -19,6 +19,8 @@ extern char bin_mknod_start[],    bin_mknod_end[];
 extern char bin_fdisk_start[],    bin_fdisk_end[];
 extern char bin_mount_start[],    bin_mount_end[];
 extern char bin_test_m12_start[], bin_test_m12_end[];
+extern char bin_ping_start[],     bin_ping_end[];
+extern char bin_test_m13_start[], bin_test_m13_end[];
 
 struct binary_entry {
     const char *path;
@@ -47,6 +49,8 @@ static const struct binary_entry builtin_table[] = {
     { "/sbin/fdisk",   bin_fdisk_start,    bin_fdisk_end },
     { "/bin/mount",    bin_mount_start,    bin_mount_end },
     { "/bin/test_m12", bin_test_m12_start, bin_test_m12_end },
+    { "/bin/ping",     bin_ping_start,     bin_ping_end },
+    { "/bin/test_m13", bin_test_m13_start, bin_test_m13_end },
     { NULL, NULL, NULL }
 };
 

@@ -11,6 +11,7 @@
 static volatile uint64_t g_pit_ticks = 0;
 
 extern void sched_timer_tick(void);
+extern int e1000_poll_rx(void);
 
 static void pit_irq_handler(interrupt_frame_t *frame)
 {
@@ -19,6 +20,9 @@ static void pit_irq_handler(interrupt_frame_t *frame)
 
     /* Acknowledge interrupt to PIC */
     pic_send_eoi(0);
+
+    /* Poll network device on timer tick */
+    e1000_poll_rx();
 
     /* Notify scheduler */
     sched_timer_tick();

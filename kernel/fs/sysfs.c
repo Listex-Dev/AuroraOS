@@ -2,6 +2,7 @@
 #include <aurora/fs/vfs.h>
 #include <aurora/drivers/pci.h>
 #include <aurora/drivers/block.h>
+#include <aurora/net/netdev.h>
 #include <aurora/mm/heap.h>
 #include <aurora/string.h>
 #include <aurora/printk.h>
@@ -198,6 +199,42 @@ static ssize_t read_bdev_size(char *buf, size_t max_len, void *data)
     return snprintf(buf, max_len, "%llu\n", b->total_blocks);
 }
 
+static ssize_t read_net_address(char *buf, size_t max_len, void *data)
+{
+    struct netdev *dev = (struct netdev *)data;
+    return snprintf(buf, max_len, "%02x:%02x:%02x:%02x:%02x:%02x\n",
+                    dev->hwaddr[0], dev->hwaddr[1], dev->hwaddr[2],
+                    dev->hwaddr[3], dev->hwaddr[4], dev->hwaddr[5]);
+}
+
+static ssize_t read_net_mtu(char *buf, size_t max_len, void *data)
+{
+    struct netdev *dev = (struct netdev *)data;
+    return snprintf(buf, max_len, "%u\n", dev->mtu);
+}
+
+static ssize_t read_net_operstate(char *buf, size_t max_len, void *data)
+{
+    struct netdev *dev = (struct netdev *)data;
+    return snprintf(buf, max_len, "%s\n", (dev->flags & IFF_UP) ? "up" : "down");
+}
+
+static struct super_block *s_sysfs_sb = NULL;
+static struct dentry *s_sysfs_class_net_dentry = NULL;
+
+void sysfs_register_netdev(struct netdev *dev)
+{
+    if (!s_sysfs_sb || !s_sysfs_class_net_dentry || !dev) {
+        return;
+    }
+    struct dentry *dev_d = create_sysfs_dir(s_sysfs_sb, s_sysfs_class_net_dentry, dev->name);
+    if (dev_d) {
+        create_sysfs_file_data(s_sysfs_sb, dev_d, "address", read_net_address, dev, 0444);
+        create_sysfs_file_data(s_sysfs_sb, dev_d, "mtu", read_net_mtu, dev, 0444);
+        create_sysfs_file_data(s_sysfs_sb, dev_d, "operstate", read_net_operstate, dev, 0444);
+    }
+}
+
 struct super_block *sysfs_create(void)
 {
     struct super_block *sb = (struct super_block *)kzalloc(sizeof(struct super_block), GFP_KERNEL);
@@ -238,6 +275,15 @@ struct super_block *sysfs_create(void)
         if (tty_d) {
             create_sysfs_file(sb, tty_d, "console", read_tty_active, NULL, 0444);
             create_sysfs_file(sb, tty_d, "tty0", read_tty_active, NULL, 0444);
+        }
+
+        struct dentry *net_d = create_sysfs_dir(sb, class_d, "net");
+        s_sysfs_class_net_dentry = net_d;
+        s_sysfs_sb = sb;
+        if (net_d) {
+            for (struct netdev *dev = netdev_get_list(); dev != NULL; dev = dev->next) {
+                sysfs_register_netdev(dev);
+            }
         }
     }
 

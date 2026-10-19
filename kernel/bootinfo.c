@@ -7,6 +7,8 @@ struct boot_info g_boot_info;
 /* Higher half physical mapping offset */
 #define KERNEL_DIRECT_MAP_BASE 0xFFFF800000000000ULL
 
+static char s_boot_cmdline[256];
+
 static void *phys_to_virt(uint64_t phys)
 {
     return (void *)(KERNEL_DIRECT_MAP_BASE + phys);
@@ -38,7 +40,10 @@ void bootinfo_init(uint64_t magic, uint64_t mbi_addr)
 
         if (flags & (1 << 2)) {
             uint32_t cmdline_phys = mbi[4];
-            g_boot_info.cmdline = (const char *)phys_to_virt(cmdline_phys);
+            const char *src = (const char *)phys_to_virt(cmdline_phys);
+            strncpy(s_boot_cmdline, src, sizeof(s_boot_cmdline) - 1);
+            s_boot_cmdline[sizeof(s_boot_cmdline) - 1] = '\0';
+            g_boot_info.cmdline = s_boot_cmdline;
         }
 
         if (flags & (1 << 3)) {
@@ -80,7 +85,10 @@ void bootinfo_init(uint64_t magic, uint64_t mbi_addr)
 
             if (type == 1) {
                 /* Command line */
-                g_boot_info.cmdline = (const char *)(tag_ptr + 8);
+                const char *src = (const char *)(tag_ptr + 8);
+                strncpy(s_boot_cmdline, src, sizeof(s_boot_cmdline) - 1);
+                s_boot_cmdline[sizeof(s_boot_cmdline) - 1] = '\0';
+                g_boot_info.cmdline = s_boot_cmdline;
             } else if (type == 3) {
                 /* Multiboot 2 Module */
                 g_boot_info.initrd_start = *(uint32_t *)(tag_ptr + 8);

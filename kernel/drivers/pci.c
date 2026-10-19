@@ -44,20 +44,24 @@ void pci_write_config32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset,
 
 void pci_write_config16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t val)
 {
-    uint32_t current = pci_read_config32(bus, slot, func, offset);
-    int shift = (offset & 2) * 8;
-    current &= ~(0xFFFF << shift);
-    current |= ((uint32_t)val << shift);
-    pci_write_config32(bus, slot, func, offset, current);
+    uint32_t address = (1U << 31) |
+                       ((uint32_t)bus << 16) |
+                       ((uint32_t)slot << 11) |
+                       ((uint32_t)func << 8) |
+                       (offset & 0xFC);
+    outl(PCI_CONFIG_ADDR, address);
+    outw(PCI_CONFIG_DATA + (offset & 2), val);
 }
 
 void pci_write_config8(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint8_t val)
 {
-    uint32_t current = pci_read_config32(bus, slot, func, offset);
-    int shift = (offset & 3) * 8;
-    current &= ~(0xFF << shift);
-    current |= ((uint32_t)val << shift);
-    pci_write_config32(bus, slot, func, offset, current);
+    uint32_t address = (1U << 31) |
+                       ((uint32_t)bus << 16) |
+                       ((uint32_t)slot << 11) |
+                       ((uint32_t)func << 8) |
+                       (offset & 0xFC);
+    outl(PCI_CONFIG_ADDR, address);
+    outb(PCI_CONFIG_DATA + (offset & 3), val);
 }
 
 struct pci_device *pci_find_device(uint16_t vendor_id, uint16_t device_id)
