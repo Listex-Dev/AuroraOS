@@ -86,6 +86,47 @@ void kbd_inject_scancode(uint8_t scancode)
         return;
     }
 
+    /* Shift + PageUp / PageDown for console scrollback */
+    if (s_shift && (code == 0x49 || (s_extended && code == 0x49))) {
+        vt_scroll_view(vt_get_active(), 10);
+        s_extended = false;
+        return;
+    }
+    if (s_shift && (code == 0x51 || (s_extended && code == 0x51))) {
+        vt_scroll_view(vt_get_active(), -10);
+        s_extended = false;
+        return;
+    }
+
+    /* Extended keys: cursor keys, navigation, etc. */
+    if (s_extended) {
+        s_extended = false;
+        const char *seq = NULL;
+        switch (code) {
+            case 0x48: seq = "\033[A"; break; /* Up */
+            case 0x50: seq = "\033[B"; break; /* Down */
+            case 0x4D: seq = "\033[C"; break; /* Right */
+            case 0x4B: seq = "\033[D"; break; /* Left */
+            case 0x47: seq = "\033[H"; break; /* Home */
+            case 0x4F: seq = "\033[F"; break; /* End */
+            case 0x49: seq = "\033[5~"; break; /* Page Up */
+            case 0x51: seq = "\033[6~"; break; /* Page Down */
+            case 0x52: seq = "\033[2~"; break; /* Insert */
+            case 0x53: seq = "\033[3~"; break; /* Delete */
+            default: break;
+        }
+        if (seq) {
+            struct tty *active_tty = tty_get_active_vt();
+            if (active_tty) {
+                while (*seq) {
+                    tty_input_char(active_tty, *seq++);
+                }
+            }
+            return;
+        }
+        return;
+    }
+
     /* Translate scancode to character */
     char c = 0;
     if (code < 128) {

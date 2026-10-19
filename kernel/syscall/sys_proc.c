@@ -343,7 +343,16 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
     }
 
     if (!elf_data) {
-        elf_data = find_builtin_binary(kfilename, &binary_size);
+        mode_t b_mode = 0755;
+        uid_t b_uid = 0;
+        gid_t b_gid = 0;
+        elf_data = find_builtin_binary_meta(kfilename, &binary_size, &b_mode, &b_uid, &b_gid);
+        if (elf_data) {
+            bin_mode = b_mode;
+            bin_uid = b_uid;
+            bin_gid = b_gid;
+            bin_has_stat = true;
+        }
     }
 
     if (!elf_data) {

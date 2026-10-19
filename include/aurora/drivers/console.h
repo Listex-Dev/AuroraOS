@@ -36,8 +36,14 @@ enum ansi_state {
     ANSI_STATE_CSI,
 };
 
+#define SCROLLBACK_LINES 256
+
 struct vt_console {
     uint16_t buffer[VGA_HEIGHT * VGA_WIDTH];
+    uint16_t scrollback[SCROLLBACK_LINES * VGA_WIDTH];
+    int scrollback_head;
+    int scrollback_count;
+    int scroll_offset;
     int cursor_x;
     int cursor_y;
     uint8_t cur_attr;
@@ -56,5 +62,6 @@ void vt_write(int vt_num, const char *buf, size_t count);
 void vt_clear(int vt_num);
 void vt_set_cursor(int vt_num, int x, int y);
 uint16_t *vt_get_buffer(int vt_num);
+void vt_scroll_view(int vt_num, int lines);
 
 #endif /* _AURORA_DRIVERS_CONSOLE_H */

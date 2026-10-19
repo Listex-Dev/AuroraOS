@@ -24,10 +24,33 @@ static void update_hardware_cursor(int x, int y)
 static void console_flush_active(void)
 {
     struct vt_console *vt = &g_vts[g_active_vt];
-    for (int i = 0; i < VGA_WIDTH * VGA_HEIGHT; i++) {
-        g_vga_mem[i] = vt->buffer[i];
+    int offset = vt->scroll_offset;
+    if (offset < 0) offset = 0;
+    if (offset > vt->scrollback_count) offset = vt->scrollback_count;
+
+    for (int y = 0; y < VGA_HEIGHT; y++) {
+        int log_y = y - offset;
+        if (log_y >= 0) {
+            const uint16_t *src = &vt->buffer[log_y * VGA_WIDTH];
+            for (int x = 0; x < VGA_WIDTH; x++) {
+                g_vga_mem[y * VGA_WIDTH + x] = src[x];
+            }
+        } else {
+            int hist_idx = -log_y - 1;
+            int slot = (vt->scrollback_head - 1 - hist_idx) % SCROLLBACK_LINES;
+            if (slot < 0) slot += SCROLLBACK_LINES;
+            const uint16_t *src = &vt->scrollback[slot * VGA_WIDTH];
+            for (int x = 0; x < VGA_WIDTH; x++) {
+                g_vga_mem[y * VGA_WIDTH + x] = src[x];
+            }
+        }
     }
-    update_hardware_cursor(vt->cursor_x, vt->cursor_y);
+
+    if (offset == 0) {
+        update_hardware_cursor(vt->cursor_x, vt->cursor_y);
+    } else {
+        update_hardware_cursor(-1, -1);
+    }
 }
 
 void vt_clear(int vt_num)
@@ -41,6 +64,7 @@ void vt_clear(int vt_num)
     }
     vt->cursor_x = 0;
     vt->cursor_y = 0;
+    vt->scroll_offset = 0;
 
     if (vt_num == g_active_vt) {
         console_flush_active();
@@ -49,6 +73,16 @@ void vt_clear(int vt_num)
 
 static void vt_scroll(struct vt_console *vt)
 {
+    /* Save top line to scrollback ring buffer */
+    int slot = vt->scrollback_head;
+    for (int x = 0; x < VGA_WIDTH; x++) {
+        vt->scrollback[slot * VGA_WIDTH + x] = vt->buffer[x];
+    }
+    vt->scrollback_head = (vt->scrollback_head + 1) % SCROLLBACK_LINES;
+    if (vt->scrollback_count < SCROLLBACK_LINES) {
+        vt->scrollback_count++;
+    }
+
     uint16_t blank = (uint16_t)(' ' | ((uint16_t)vt->cur_attr << 8));
     for (int y = 0; y < VGA_HEIGHT - 1; y++) {
         for (int x = 0; x < VGA_WIDTH; x++) {
@@ -59,10 +93,39 @@ static void vt_scroll(struct vt_console *vt)
         vt->buffer[(VGA_HEIGHT - 1) * VGA_WIDTH + x] = blank;
     }
     vt->cursor_y = VGA_HEIGHT - 1;
+
+    if (vt == &g_vts[g_active_vt]) {
+        console_flush_active();
+    }
+}
+
+void vt_scroll_view(int vt_num, int lines)
+{
+    if (vt_num < 0 || vt_num >= MAX_VTS) return;
+    struct vt_console *vt = &g_vts[vt_num];
+
+    vt->scroll_offset += lines;
+    if (vt->scroll_offset < 0) {
+        vt->scroll_offset = 0;
+    }
+    if (vt->scroll_offset > vt->scrollback_count) {
+        vt->scroll_offset = vt->scrollback_count;
+    }
+
+    if (vt_num == g_active_vt) {
+        console_flush_active();
+    }
 }
 
 static void vt_put_raw_char(struct vt_console *vt, int vt_num, char c)
 {
+    if (vt->scroll_offset > 0) {
+        vt->scroll_offset = 0;
+        if (vt_num == g_active_vt) {
+            console_flush_active();
+        }
+    }
+
     if (c == '\r') {
         vt->cursor_x = 0;
     } else if (c == '\n') {
@@ -90,7 +153,7 @@ static void vt_put_raw_char(struct vt_console *vt, int vt_num, char c)
         int idx = vt->cursor_y * VGA_WIDTH + vt->cursor_x;
         uint16_t val = (uint16_t)((uint8_t)c | ((uint16_t)vt->cur_attr << 8));
         vt->buffer[idx] = val;
-        if (vt_num == g_active_vt) {
+        if (vt_num == g_active_vt && vt->scroll_offset == 0) {
             g_vga_mem[idx] = val;
         }
 
@@ -100,14 +163,11 @@ static void vt_put_raw_char(struct vt_console *vt, int vt_num, char c)
             vt->cursor_y++;
             if (vt->cursor_y >= VGA_HEIGHT) {
                 vt_scroll(vt);
-                if (vt_num == g_active_vt) {
-                    console_flush_active();
-                }
             }
         }
     }
 
-    if (vt_num == g_active_vt) {
+    if (vt_num == g_active_vt && vt->scroll_offset == 0) {
         update_hardware_cursor(vt->cursor_x, vt->cursor_y);
     }
 }
@@ -185,6 +245,47 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
             vt->cursor_x = (vt->cursor_x >= n) ? vt->cursor_x - n : 0;
             break;
         }
+        case 'G': {
+            /* Cursor Horizontal Absolute */
+            int col = (p1 > 0) ? p1 - 1 : 0;
+            if (col >= VGA_WIDTH) col = VGA_WIDTH - 1;
+            vt->cursor_x = col;
+            break;
+        }
+        case 'd': {
+            /* Cursor Vertical Absolute */
+            int row = (p1 > 0) ? p1 - 1 : 0;
+            if (row >= VGA_HEIGHT) row = VGA_HEIGHT - 1;
+            vt->cursor_y = row;
+            break;
+        }
+        case 'S': {
+            /* Scroll up (pan down) */
+            int n = (p1 > 0) ? p1 : 1;
+            for (int i = 0; i < n; i++) {
+                vt_scroll(vt);
+            }
+            break;
+        }
+        case 'T': {
+            /* Scroll down (pan up) */
+            int n = (p1 > 0) ? p1 : 1;
+            uint16_t blank = (uint16_t)(' ' | ((uint16_t)vt->cur_attr << 8));
+            for (int i = 0; i < n; i++) {
+                for (int y = VGA_HEIGHT - 1; y > 0; y--) {
+                    for (int x = 0; x < VGA_WIDTH; x++) {
+                        vt->buffer[y * VGA_WIDTH + x] = vt->buffer[(y - 1) * VGA_WIDTH + x];
+                    }
+                }
+                for (int x = 0; x < VGA_WIDTH; x++) {
+                    vt->buffer[x] = blank;
+                }
+            }
+            if (vt_num == g_active_vt) {
+                console_flush_active();
+            }
+            break;
+        }
         case 'J': {
             /* Erase in Display */
             if (p1 == 2) {
@@ -223,7 +324,7 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
             break;
     }
 
-    if (vt_num == g_active_vt) {
+    if (vt_num == g_active_vt && vt->scroll_offset == 0) {
         update_hardware_cursor(vt->cursor_x, vt->cursor_y);
     }
 }
