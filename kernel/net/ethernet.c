@@ -2,6 +2,7 @@
 #include <aurora/net/arp.h>
 #include <aurora/net/ipv4.h>
 #include <aurora/string.h>
+#include <aurora/printk.h>
 
 int ethernet_receive(struct netdev *dev, netbuf_t *nb)
 {
@@ -12,6 +13,13 @@ int ethernet_receive(struct netdev *dev, netbuf_t *nb)
 
     struct ethhdr *eth = (struct ethhdr *)nb->data;
     uint16_t proto = net_ntohs(eth->h_proto);
+
+    if (proto == ETH_P_IP && nb->len >= sizeof(struct ethhdr) + sizeof(struct iphdr)) {
+        struct iphdr *ip = (struct iphdr *)(nb->data + sizeof(struct ethhdr));
+        if (ip->version == 4) {
+            arp_cache_insert(ip->saddr, eth->h_source);
+        }
+    }
 
     /* Strip Ethernet header */
     netbuf_pull(nb, sizeof(struct ethhdr));

@@ -140,10 +140,16 @@ int ipv4_receive(struct netdev *dev, netbuf_t *nb)
     uint32_t dst_ip = ip->daddr;
     uint8_t proto = ip->protocol;
     size_t hdr_len = ip->ihl * 4;
+    uint16_t tot_len = net_ntohs(ip->tot_len);
 
-    if (nb->len < hdr_len) {
+    if (nb->len < hdr_len || tot_len < hdr_len) {
         netbuf_free(nb);
         return -1;
+    }
+
+    if (tot_len < nb->len) {
+        nb->len = tot_len;
+        nb->tail = nb->data + tot_len;
     }
 
     netbuf_pull(nb, hdr_len);

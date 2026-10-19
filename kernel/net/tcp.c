@@ -71,27 +71,26 @@ void tcp_unbind(struct socket *sock)
 
 static uint16_t tcp_checksum(uint32_t saddr, uint32_t daddr, struct tcphdr *tcp, size_t tcp_len)
 {
-    struct tcp_pseudo_hdr ph;
-    ph.src    = saddr;
-    ph.dst    = daddr;
-    ph.zero   = 0;
-    ph.proto  = IPPROTO_TCP;
-    ph.length = net_htons((uint16_t)tcp_len);
-
     uint32_t sum = 0;
-    const uint16_t *ptr = (const uint16_t *)&ph;
-    for (size_t i = 0; i < sizeof(ph) / 2; i++) {
-        sum += *ptr++;
-    }
 
-    ptr = (const uint16_t *)tcp;
+    /* Pseudo-header */
+    sum += (uint16_t)(saddr & 0xFFFF);
+    sum += (uint16_t)(saddr >> 16);
+    sum += (uint16_t)(daddr & 0xFFFF);
+    sum += (uint16_t)(daddr >> 16);
+    sum += (uint16_t)net_htons(IPPROTO_TCP);
+    sum += (uint16_t)net_htons((uint16_t)tcp_len);
+
+    /* TCP header + payload */
+    const uint8_t *ptr = (const uint8_t *)tcp;
     size_t len = tcp_len;
     while (len > 1) {
-        sum += *ptr++;
+        sum += ((uint16_t)ptr[1] << 8) | (uint16_t)ptr[0];
+        ptr += 2;
         len -= 2;
     }
     if (len == 1) {
-        sum += *(const uint8_t *)ptr;
+        sum += (uint16_t)(*ptr);
     }
 
     while (sum >> 16) {
@@ -126,8 +125,10 @@ static int tcp_send_packet(struct socket *sock, uint8_t flags, const void *data,
     tcp->doff    = sizeof(struct tcphdr) / 4;
     tcp->res1    = 0;
     tcp->flags   = flags;
-    tcp->window  = net_htons(SOCKET_BUFFER_SIZE - sock->rx_count);
-    tcp->check   = 0;
+    uint32_t win_avail = (SOCKET_BUFFER_SIZE > sock->rx_count) ? (SOCKET_BUFFER_SIZE - sock->rx_count) : 0;
+    if (win_avail > 65535) win_avail = 65535;
+    tcp->window = net_htons((uint16_t)win_avail);
+    tcp->check = 0;
     tcp->urg_ptr = 0;
 
     if (data && data_len > 0) {
