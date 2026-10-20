@@ -1,0 +1,15 @@
+AuroraOS System Call ABI Specification
+======================================
+
+Architecture: x86-64 (AMD64 Long Mode)
+Instruction: syscall / sysretq
+
+Registers:
+  Syscall Number:  RAX
+  Argument 1:      RDI
+  Argument 2:      RSI
+  Argument 3:      RDX
+  Argument 4:      R10
+  Argument 5:      R8
+  Argument 6:      R9
+  Return Value:    RAX (>=0 success, -errno on error)

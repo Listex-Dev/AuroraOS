@@ -156,92 +156,79 @@ void services_subsys_init(void)
     sys_mkdir("/var/spool/cron", 0755);
     sys_mkdir("/var/spool/cron/crontabs", 0755);
 
-    /* /etc/rc.conf */
-    int fd = sys_open("/etc/rc.conf", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        const char *rc = "# /etc/rc.conf - AuroraOS system service configuration\n"
-                         "services=\"networking syslogd crond sshd\"\n";
-        sys_write(fd, rc, strlen(rc));
-        sys_close(fd);
-    }
+    static void (*write_if_missing)(const char *, const char *, mode_t) = NULL;
+    (void)write_if_missing;
 
-    /* /etc/crontab */
-    fd = sys_open("/etc/crontab", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        const char *cr = "# /etc/crontab - system crontab\n"
-                         "* * * * * root /bin/echo \"cron task running\" >> /var/log/cron\n";
-        sys_write(fd, cr, strlen(cr));
-        sys_close(fd);
-    }
+    #define WRITE_IF_MISSING(path, content, mode) do { \
+        int _f = sys_open((path), O_RDONLY, 0); \
+        if (_f >= 0) { \
+            sys_close(_f); \
+        } else { \
+            _f = sys_open((path), O_WRONLY | O_CREAT | O_TRUNC, (mode)); \
+            if (_f >= 0) { \
+                sys_write(_f, (content), strlen(content)); \
+                sys_close(_f); \
+            } \
+        } \
+    } while (0)
 
-    /* /etc/init.d/syslogd */
-    fd = sys_open("/etc/init.d/syslogd", O_WRONLY | O_CREAT | O_TRUNC, 0755);
-    if (fd >= 0) {
-        const char *s = "#!/bin/sh\n"
-                        "[ \"$1\" = \"status\" ] && [ -f /run/syslogd.pid ] && echo \"syslogd is running\" && exit 0\n"
-                        "[ \"$1\" = \"status\" ] && echo \"syslogd is not running\" && exit 3\n"
-                        "[ \"$1\" = \"start\" ] && [ -f /run/syslogd.pid ] && echo \"syslogd already running\" && exit 0\n"
-                        "[ \"$1\" = \"start\" ] && /sbin/syslogd && exit 0\n"
-                        "[ \"$1\" = \"stop\" ] && killall syslogd 2>/dev/null; rm -f /run/syslogd.pid\n"
-                        "[ \"$1\" = \"stop\" ] && exit 0\n"
-                        "[ \"$1\" = \"restart\" ] && killall syslogd 2>/dev/null; rm -f /run/syslogd.pid\n"
-                        "[ \"$1\" = \"restart\" ] && /sbin/syslogd && exit 0\n"
-                        "echo \"Usage: $0 start, stop, restart, status\"\n"
-                        "exit 1\n";
-        sys_write(fd, s, strlen(s));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/rc.conf",
+                     "# /etc/rc.conf - AuroraOS system service configuration\n"
+                     "services=\"networking syslogd crond sshd\"\n", 0644);
 
-    /* /etc/init.d/crond */
-    fd = sys_open("/etc/init.d/crond", O_WRONLY | O_CREAT | O_TRUNC, 0755);
-    if (fd >= 0) {
-        const char *s = "#!/bin/sh\n"
-                        "[ \"$1\" = \"status\" ] && [ -f /run/crond.pid ] && echo \"crond is running\" && exit 0\n"
-                        "[ \"$1\" = \"status\" ] && echo \"crond is not running\" && exit 3\n"
-                        "[ \"$1\" = \"start\" ] && [ -f /run/crond.pid ] && echo \"crond already running\" && exit 0\n"
-                        "[ \"$1\" = \"start\" ] && /sbin/crond && exit 0\n"
-                        "[ \"$1\" = \"stop\" ] && killall crond 2>/dev/null; rm -f /run/crond.pid\n"
-                        "[ \"$1\" = \"stop\" ] && exit 0\n"
-                        "[ \"$1\" = \"restart\" ] && killall crond 2>/dev/null; rm -f /run/crond.pid\n"
-                        "[ \"$1\" = \"restart\" ] && /sbin/crond && exit 0\n"
-                        "echo \"Usage: $0 start, stop, restart, status\"\n"
-                        "exit 1\n";
-        sys_write(fd, s, strlen(s));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/crontab",
+                     "# /etc/crontab - system crontab\n"
+                     "* * * * * root /bin/echo \"cron task running\" >> /var/log/cron\n", 0644);
 
-    /* /etc/init.d/sshd */
-    fd = sys_open("/etc/init.d/sshd", O_WRONLY | O_CREAT | O_TRUNC, 0755);
-    if (fd >= 0) {
-        const char *s = "#!/bin/sh\n"
-                        "[ \"$1\" = \"status\" ] && [ -f /run/sshd.pid ] && echo \"sshd is running\" && exit 0\n"
-                        "[ \"$1\" = \"status\" ] && echo \"sshd is not running\" && exit 3\n"
-                        "[ \"$1\" = \"start\" ] && [ -f /run/sshd.pid ] && echo \"sshd already running\" && exit 0\n"
-                        "[ \"$1\" = \"start\" ] && /sbin/sshd && exit 0\n"
-                        "[ \"$1\" = \"stop\" ] && killall sshd 2>/dev/null; rm -f /run/sshd.pid\n"
-                        "[ \"$1\" = \"stop\" ] && exit 0\n"
-                        "[ \"$1\" = \"restart\" ] && killall sshd 2>/dev/null; rm -f /run/sshd.pid\n"
-                        "[ \"$1\" = \"restart\" ] && /sbin/sshd && exit 0\n"
-                        "echo \"Usage: $0 start, stop, restart, status\"\n"
-                        "exit 1\n";
-        sys_write(fd, s, strlen(s));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/init.d/syslogd",
+                     "#!/bin/sh\n"
+                     "[ \"$1\" = \"status\" ] && [ -f /run/syslogd.pid ] && echo \"syslogd is running\" && exit 0\n"
+                     "[ \"$1\" = \"status\" ] && echo \"syslogd is not running\" && exit 3\n"
+                     "[ \"$1\" = \"start\" ] && [ -f /run/syslogd.pid ] && echo \"syslogd already running\" && exit 0\n"
+                     "[ \"$1\" = \"start\" ] && /sbin/syslogd && exit 0\n"
+                     "[ \"$1\" = \"stop\" ] && killall syslogd 2>/dev/null; rm -f /run/syslogd.pid\n"
+                     "[ \"$1\" = \"stop\" ] && exit 0\n"
+                     "[ \"$1\" = \"restart\" ] && killall syslogd 2>/dev/null; rm -f /run/syslogd.pid\n"
+                     "[ \"$1\" = \"restart\" ] && /sbin/syslogd && exit 0\n"
+                     "echo \"Usage: $0 start, stop, restart, status\"\n"
+                     "exit 1\n", 0755);
 
-    /* /etc/init.d/networking */
-    fd = sys_open("/etc/init.d/networking", O_WRONLY | O_CREAT | O_TRUNC, 0755);
-    if (fd >= 0) {
-        const char *s = "#!/bin/sh\n"
-                        "[ \"$1\" = \"start\" ] && /bin/ifconfig lo 127.0.0.1 up && /sbin/ifconfig eth0 10.0.2.15 up 2>/dev/null && echo \"networking: configured\" >> /var/log/messages && exit 0\n"
-                        "[ \"$1\" = \"stop\" ] && /sbin/ifconfig eth0 down 2>/dev/null && echo \"networking: down\" >> /var/log/messages && exit 0\n"
-                        "[ \"$1\" = \"restart\" ] && /sbin/ifconfig eth0 down 2>/dev/null && /bin/ifconfig lo 127.0.0.1 up && /sbin/ifconfig eth0 10.0.2.15 up 2>/dev/null && exit 0\n"
-                        "[ \"$1\" = \"status\" ] && /bin/ifconfig lo >/dev/null && exit 0\n"
-                        "[ \"$1\" = \"status\" ] && exit 3\n"
-                        "echo \"Usage: $0 start, stop, restart, status\"\n"
-                        "exit 1\n";
-        sys_write(fd, s, strlen(s));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/init.d/crond",
+                     "#!/bin/sh\n"
+                     "[ \"$1\" = \"status\" ] && [ -f /run/crond.pid ] && echo \"crond is running\" && exit 0\n"
+                     "[ \"$1\" = \"status\" ] && echo \"crond is not running\" && exit 3\n"
+                     "[ \"$1\" = \"start\" ] && [ -f /run/crond.pid ] && echo \"crond already running\" && exit 0\n"
+                     "[ \"$1\" = \"start\" ] && /sbin/crond && exit 0\n"
+                     "[ \"$1\" = \"stop\" ] && killall crond 2>/dev/null; rm -f /run/crond.pid\n"
+                     "[ \"$1\" = \"stop\" ] && exit 0\n"
+                     "[ \"$1\" = \"restart\" ] && killall crond 2>/dev/null; rm -f /run/crond.pid\n"
+                     "[ \"$1\" = \"restart\" ] && /sbin/crond && exit 0\n"
+                     "echo \"Usage: $0 start, stop, restart, status\"\n"
+                     "exit 1\n", 0755);
+
+    WRITE_IF_MISSING("/etc/init.d/sshd",
+                     "#!/bin/sh\n"
+                     "[ \"$1\" = \"status\" ] && [ -f /run/sshd.pid ] && echo \"sshd is running\" && exit 0\n"
+                     "[ \"$1\" = \"status\" ] && echo \"sshd is not running\" && exit 3\n"
+                     "[ \"$1\" = \"start\" ] && [ -f /run/sshd.pid ] && echo \"sshd already running\" && exit 0\n"
+                     "[ \"$1\" = \"start\" ] && /sbin/sshd && exit 0\n"
+                     "[ \"$1\" = \"stop\" ] && killall sshd 2>/dev/null; rm -f /run/sshd.pid\n"
+                     "[ \"$1\" = \"stop\" ] && exit 0\n"
+                     "[ \"$1\" = \"restart\" ] && killall sshd 2>/dev/null; rm -f /run/sshd.pid\n"
+                     "[ \"$1\" = \"restart\" ] && /sbin/sshd && exit 0\n"
+                     "echo \"Usage: $0 start, stop, restart, status\"\n"
+                     "exit 1\n", 0755);
+
+    WRITE_IF_MISSING("/etc/init.d/networking",
+                     "#!/bin/sh\n"
+                     "[ \"$1\" = \"start\" ] && /bin/ifconfig lo 127.0.0.1 up && /sbin/ifconfig eth0 10.0.2.15 up 2>/dev/null && echo \"networking: configured\" >> /var/log/messages && exit 0\n"
+                     "[ \"$1\" = \"stop\" ] && /sbin/ifconfig eth0 down 2>/dev/null && echo \"networking: down\" >> /var/log/messages && exit 0\n"
+                     "[ \"$1\" = \"restart\" ] && /sbin/ifconfig eth0 down 2>/dev/null && /bin/ifconfig lo 127.0.0.1 up && /sbin/ifconfig eth0 10.0.2.15 up 2>/dev/null && exit 0\n"
+                     "[ \"$1\" = \"status\" ] && /bin/ifconfig lo >/dev/null && exit 0\n"
+                     "[ \"$1\" = \"status\" ] && exit 3\n"
+                     "echo \"Usage: $0 start, stop, restart, status\"\n"
+                     "exit 1\n", 0755);
+    #undef WRITE_IF_MISSING
 }
 
 static void launch_init_process(void)

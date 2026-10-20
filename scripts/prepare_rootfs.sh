@@ -71,9 +71,98 @@ EOF
 echo "aurora-os-trusted-key-v1-2026-pkg-signing-secret" > "$ROOTFS"/etc/pkg/trusted/aurora.key
 chmod 0600 "$ROOTFS"/etc/pkg/trusted/aurora.key
 
-# 5. Copy manual pages
+cat << 'EOF' > "$ROOTFS"/var/lib/pkg/db
+Package: coreutils
+Version: 1.0.0
+Status: installed
+Description: Core system utilities for AuroraOS
+Files:
+  /bin/ls
+  /bin/cat
+  /bin/cp
+  /bin/ps
+  /bin/vi
+  /bin/grep
+  /bin/sh
+
+EOF
+
+mkdir -p "$ROOTFS"/etc/init.d
+cat << 'EOF' > "$ROOTFS"/etc/rc.conf
+# /etc/rc.conf - AuroraOS system service configuration
+services="networking syslogd crond sshd"
+EOF
+
+cat << 'EOF' > "$ROOTFS"/etc/crontab
+# /etc/crontab - system crontab
+* * * * * root /bin/echo "cron task running" >> /var/log/cron
+EOF
+
+cat << 'EOF' > "$ROOTFS"/etc/init.d/syslogd
+#!/bin/sh
+[ "$1" = "status" ] && [ -f /run/syslogd.pid ] && echo "syslogd is running" && exit 0
+[ "$1" = "status" ] && echo "syslogd is not running" && exit 3
+[ "$1" = "start" ] && [ -f /run/syslogd.pid ] && echo "syslogd already running" && exit 0
+[ "$1" = "start" ] && /sbin/syslogd && exit 0
+[ "$1" = "stop" ] && killall syslogd 2>/dev/null; rm -f /run/syslogd.pid
+[ "$1" = "stop" ] && exit 0
+[ "$1" = "restart" ] && killall syslogd 2>/dev/null; rm -f /run/syslogd.pid
+[ "$1" = "restart" ] && /sbin/syslogd && exit 0
+echo "Usage: $0 start, stop, restart, status"
+exit 1
+EOF
+chmod 0755 "$ROOTFS"/etc/init.d/syslogd
+
+cat << 'EOF' > "$ROOTFS"/etc/init.d/crond
+#!/bin/sh
+[ "$1" = "status" ] && [ -f /run/crond.pid ] && echo "crond is running" && exit 0
+[ "$1" = "status" ] && echo "crond is not running" && exit 3
+[ "$1" = "start" ] && [ -f /run/crond.pid ] && echo "crond already running" && exit 0
+[ "$1" = "start" ] && /sbin/crond && exit 0
+[ "$1" = "stop" ] && killall crond 2>/dev/null; rm -f /run/crond.pid
+[ "$1" = "stop" ] && exit 0
+[ "$1" = "restart" ] && killall crond 2>/dev/null; rm -f /run/crond.pid
+[ "$1" = "restart" ] && /sbin/crond && exit 0
+echo "Usage: $0 start, stop, restart, status"
+exit 1
+EOF
+chmod 0755 "$ROOTFS"/etc/init.d/crond
+
+cat << 'EOF' > "$ROOTFS"/etc/init.d/sshd
+#!/bin/sh
+[ "$1" = "status" ] && [ -f /run/sshd.pid ] && echo "sshd is running" && exit 0
+[ "$1" = "status" ] && echo "sshd is not running" && exit 3
+[ "$1" = "start" ] && [ -f /run/sshd.pid ] && echo "sshd already running" && exit 0
+[ "$1" = "start" ] && /sbin/sshd && exit 0
+[ "$1" = "stop" ] && killall sshd 2>/dev/null; rm -f /run/sshd.pid
+[ "$1" = "stop" ] && exit 0
+[ "$1" = "restart" ] && killall sshd 2>/dev/null; rm -f /run/sshd.pid
+[ "$1" = "restart" ] && /sbin/sshd && exit 0
+echo "Usage: $0 start, stop, restart, status"
+exit 1
+EOF
+chmod 0755 "$ROOTFS"/etc/init.d/sshd
+
+cat << 'EOF' > "$ROOTFS"/etc/init.d/networking
+#!/bin/sh
+[ "$1" = "start" ] && /bin/ifconfig lo 127.0.0.1 up && /sbin/ifconfig eth0 10.0.2.15 up 2>/dev/null && echo "networking: configured" >> /var/log/messages && exit 0
+[ "$1" = "stop" ] && /sbin/ifconfig eth0 down 2>/dev/null && echo "networking: down" >> /var/log/messages && exit 0
+[ "$1" = "restart" ] && /sbin/ifconfig eth0 down 2>/dev/null && /bin/ifconfig lo 127.0.0.1 up && /sbin/ifconfig eth0 10.0.2.15 up 2>/dev/null && exit 0
+[ "$1" = "status" ] && /bin/ifconfig lo >/dev/null && exit 0
+[ "$1" = "status" ] && exit 3
+echo "Usage: $0 start, stop, restart, status"
+exit 1
+EOF
+chmod 0755 "$ROOTFS"/etc/init.d/networking
+
+# 5. Copy manual pages and system documentation
 if [ -d user/share/man ]; then
     cp -r user/share/man/* "$ROOTFS"/usr/share/man/
+fi
+
+if [ -d user/share/doc ]; then
+    mkdir -p "$ROOTFS"/usr/share/doc
+    cp -r user/share/doc/* "$ROOTFS"/usr/share/doc/
 fi
 
 # 6. Copy test packages

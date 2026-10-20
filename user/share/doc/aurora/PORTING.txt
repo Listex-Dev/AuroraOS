@@ -1,0 +1,8 @@
+AuroraOS Application Porting Guide
+==================================
+
+1. Runtime:
+AuroraOS libc provides POSIX unistd, stdio, stdlib, dirent, termios, signal, sha256.
+
+2. Binary Format:
+ELF64 static or dynamic executables loaded via ELF PT_LOAD segments.

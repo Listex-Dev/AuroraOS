@@ -1,0 +1,19 @@
+AuroraOS 2.0 Ultra System Handbook
+===================================
+
+1. System Architecture
+AuroraOS is a modern monolithic POSIX-compatible operating system for x86-64 long mode.
+All system abstractions follow standard Unix principles: everything is a file,
+virtual filesystems (/proc, /sys, /dev, /tmp), and ring-3 processes with fast syscall gate.
+
+2. Process Management
+Full fork/execve/wait4 lifecycle with signals, job control, and zombie reaping.
+
+3. Loadable Kernel Modules (LKM)
+Dynamic loading and unloading of kernel modules (.ko) with in-kernel ELF64 relocation.
+
+4. Package Management
+Managed via pkg with cryptographic HMAC-SHA256 signatures and /var/lib/pkg/db.
+
+5. Services & Daemons
+SysV service framework under /etc/init.d/ managing syslogd, crond, networking, and sshd.
