@@ -263,6 +263,12 @@ int64_t sys_getdents64(int fd, void *dirp, size_t count)
         dir_dentry = dir_dentry->d_mounted->mnt_root;
     }
 
+    if (file->f_pos <= 2 && dir_dentry->d_sb && dir_dentry->d_sb->s_type &&
+        (strcmp(dir_dentry->d_sb->s_type, "ext4") == 0 || strcmp(dir_dentry->d_sb->s_type, "ext2") == 0)) {
+        extern int ext2_populate_dir(struct dentry *dir_dentry);
+        ext2_populate_dir(dir_dentry);
+    }
+
     uint8_t *out = (uint8_t *)dirp;
     size_t bytes_written = 0;
     uint64_t current_idx = 0;

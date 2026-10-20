@@ -142,5 +142,6 @@ struct ext4_extent_idx {
 } __attribute__((packed));
 
 struct super_block *ext2_mount(struct block_device *bdev);
+int ext2_populate_dir(struct dentry *dir_dentry);
 
 #endif /* _AURORA_FS_EXT2_H */

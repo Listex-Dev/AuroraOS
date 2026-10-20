@@ -627,6 +627,64 @@ static struct dentry *ext2_lookup(struct inode *dir, struct dentry *target)
     return NULL;
 }
 
+int ext2_populate_dir(struct dentry *dir_dentry)
+{
+    if (!dir_dentry || !dir_dentry->d_inode || !dir_dentry->d_sb) return -EINVAL;
+    if (!S_ISDIR(dir_dentry->d_inode->i_mode)) return -ENOTDIR;
+
+    struct inode *dir = dir_dentry->d_inode;
+    struct ext2_fs_info *fs = (struct ext2_fs_info *)dir->i_sb->s_fs_info;
+    struct ext2_inode_info *dir_info = (struct ext2_inode_info *)dir->i_private;
+    if (!fs || !dir_info) return -EINVAL;
+
+    uint8_t *blk_buf = (uint8_t *)kmalloc(fs->block_size, GFP_KERNEL);
+    if (!blk_buf) return -ENOMEM;
+
+    uint32_t num_blocks = (dir_info->raw.i_size + fs->block_size - 1) / fs->block_size;
+    if (num_blocks == 0 && dir_info->raw.i_blocks > 0) {
+        num_blocks = dir_info->raw.i_blocks / (fs->block_size / 512);
+    }
+
+    for (uint32_t b = 0; b < num_blocks; b++) {
+        uint32_t pblock = ext2_bmap(fs, &dir_info->raw, b, false);
+        if (pblock == 0) continue;
+
+        if (ext2_read_block(fs, pblock, blk_buf) != 0) continue;
+
+        uint32_t offset = 0;
+        while (offset < fs->block_size) {
+            struct ext2_dir_entry *de = (struct ext2_dir_entry *)(blk_buf + offset);
+            if (de->rec_len == 0) break;
+
+            if (de->inode != 0) {
+                char name[256];
+                size_t nlen = de->name_len;
+                if (nlen >= sizeof(name)) nlen = sizeof(name) - 1;
+                memcpy(name, de->name, nlen);
+                name[nlen] = '\0';
+
+                if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
+                    struct dentry *existing = dentry_lookup(dir_dentry, name);
+                    if (!existing) {
+                        struct ext2_inode raw;
+                        if (ext2_read_raw_inode(fs, de->inode, &raw) == 0) {
+                            struct inode *child_inode = ext2_build_vfs_inode(dir->i_sb, de->inode, &raw);
+                            if (child_inode) {
+                                dentry_create(name, dir_dentry, child_inode);
+                            }
+                        }
+                    }
+                }
+            }
+
+            offset += de->rec_len;
+        }
+    }
+
+    kfree(blk_buf);
+    return 0;
+}
+
 static int ext2_dir_create(struct inode *dir, struct dentry *dentry, mode_t mode)
 {
     if (!dir || !dir->i_sb || !dentry) return -EINVAL;
