@@ -8,6 +8,7 @@
 #include <aurora/arch/x86_64/msr.h>
 #include <aurora/mm/vmm.h>
 #include <aurora/mm/heap.h>
+#include <aurora/sync/spinlock.h>
 
 #define MAX_TASKS 64
 
@@ -18,23 +19,33 @@ static size_t current_idx = 0;
 static task_t kernel_idle_task;
 static task_t *g_current_task = NULL;
 static pid_t g_next_pid = 1;
+static spinlock_t sched_lock = SPINLOCK_INIT;
 
 pid_t sched_allocate_pid(void)
 {
-    return g_next_pid++;
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
+    pid_t pid = g_next_pid++;
+    spin_unlock_irqrestore(&sched_lock, flags);
+    return pid;
 }
 
 size_t sched_num_tasks(void)
 {
-    return num_tasks;
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
+    size_t count = num_tasks;
+    spin_unlock_irqrestore(&sched_lock, flags);
+    return count;
 }
 
 task_t *sched_get_task_at(size_t index)
 {
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
+    task_t *task = NULL;
     if (index < num_tasks) {
-        return runqueue[index];
+        task = runqueue[index];
     }
-    return NULL;
+    spin_unlock_irqrestore(&sched_lock, flags);
+    return task;
 }
 
 void sched_init(void)
@@ -61,13 +72,18 @@ void sched_init(void)
 
 void sched_add_task(task_t *task)
 {
-    if (num_tasks < MAX_TASKS && task != NULL) {
+    if (!task) return;
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
+    if (num_tasks < MAX_TASKS) {
         runqueue[num_tasks++] = task;
     }
+    spin_unlock_irqrestore(&sched_lock, flags);
 }
 
 void sched_remove_task(task_t *task)
 {
+    if (!task) return;
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
     for (size_t i = 0; i < num_tasks; i++) {
         if (runqueue[i] == task) {
             for (size_t j = i; j < num_tasks - 1; j++) {
@@ -80,6 +96,7 @@ void sched_remove_task(task_t *task)
             break;
         }
     }
+    spin_unlock_irqrestore(&sched_lock, flags);
 }
 
 task_t *sched_current(void)
@@ -89,30 +106,39 @@ task_t *sched_current(void)
 
 task_t *sched_find_task(pid_t pid)
 {
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
     for (size_t i = 0; i < num_tasks; i++) {
         if (runqueue[i] && runqueue[i]->pid == pid) {
+            spin_unlock_irqrestore(&sched_lock, flags);
             return runqueue[i];
         }
     }
+    spin_unlock_irqrestore(&sched_lock, flags);
     return NULL;
 }
 
 task_t *sched_find_child(pid_t ppid, pid_t pid)
 {
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
     for (size_t i = 0; i < num_tasks; i++) {
         task_t *t = runqueue[i];
         if (t && t->ppid == ppid) {
             if (pid <= 0 || t->pid == pid) {
+                spin_unlock_irqrestore(&sched_lock, flags);
                 return t;
             }
         }
     }
+    spin_unlock_irqrestore(&sched_lock, flags);
     return NULL;
 }
 
 void sched_yield(void)
 {
+    uint64_t flags = spin_lock_irqsave(&sched_lock);
+
     if (num_tasks <= 1) {
+        spin_unlock_irqrestore(&sched_lock, flags);
         return;
     }
 
@@ -129,6 +155,7 @@ void sched_yield(void)
     }
 
     if (next_idx == current_idx) {
+        spin_unlock_irqrestore(&sched_lock, flags);
         return; /* No other runnable task */
     }
 
@@ -137,6 +164,8 @@ void sched_yield(void)
 
     current_idx = next_idx;
     g_current_task = next;
+
+    spin_unlock_irqrestore(&sched_lock, flags);
 
     /* Switch CR3 address space if task has a distinct PML4 */
     if (next->cr3 && next->cr3 != read_cr3()) {

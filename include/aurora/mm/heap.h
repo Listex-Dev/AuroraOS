@@ -15,6 +15,7 @@ void *kzalloc(size_t size, uint32_t flags);
 void kfree(void *ptr);
 void *krealloc(void *ptr, size_t new_size, uint32_t flags);
 void *kmalloc_aligned(size_t size, size_t alignment, uint32_t flags);
+void kfree_aligned(void *ptr);
 
 struct heap_stats {
     size_t total_allocated_bytes;

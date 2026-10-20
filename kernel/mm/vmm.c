@@ -195,6 +195,7 @@ uint64_t *vmm_clone_user_space(uint64_t *src_pml4)
 
                         uintptr_t child_phys = pmm_alloc_page();
                         if (!child_phys) {
+                            vmm_destroy_user_space(dst_pml4);
                             return NULL;
                         }
 
@@ -259,7 +260,7 @@ void *vmm_map_mmio(uint64_t phys_addr, size_t size)
     uint64_t *k_pml4 = vmm_get_kernel_pml4();
 
     for (uint64_t p = start_page; p < end_page; p += PAGE_SIZE) {
-        vmm_map_page(k_pml4, KERNEL_DIRECT_MAP_BASE + p, p, PTE_WRITABLE);
+        vmm_map_page(k_pml4, KERNEL_DIRECT_MAP_BASE + p, p, PTE_WRITABLE | PTE_NOCACHE | PTE_WRITETHROUGH);
     }
 
     return (void *)(KERNEL_DIRECT_MAP_BASE + phys_addr);

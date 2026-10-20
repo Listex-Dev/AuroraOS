@@ -4,6 +4,7 @@
 #include <aurora/printk.h>
 #include <aurora/panic.h>
 #include <aurora/string.h>
+#include <aurora/sync/spinlock.h>
 
 #define ALLOC_MAGIC 0xABCD1234
 #define FREE_MAGIC  0xDEADBEEF
@@ -26,8 +27,8 @@ struct slab_free_node {
 };
 
 static struct slab_free_node *slab_heads[NUM_SLABS];
-
 static struct heap_stats g_heap_stats;
+static spinlock_t heap_lock = SPINLOCK_INIT;
 
 void kmalloc_init(void)
 {
@@ -53,7 +54,10 @@ void *kmalloc(size_t size, uint32_t flags)
         return NULL;
     }
 
+    uint64_t irq_flags = spin_lock_irqsave(&heap_lock);
+
     int slab_idx = get_slab_index(size);
+    void *user_ptr = NULL;
 
     if (slab_idx != -1) {
         /* Allocate from Slab Cache */
@@ -72,6 +76,7 @@ void *kmalloc(size_t size, uint32_t flags)
 
             uintptr_t phys = (pages_per_slab == 1) ? pmm_alloc_page() : pmm_alloc_pages(pages_per_slab);
             if (!phys) {
+                spin_unlock_irqrestore(&heap_lock, irq_flags);
                 return NULL; /* OOM */
             }
 
@@ -97,13 +102,7 @@ void *kmalloc(size_t size, uint32_t flags)
         g_heap_stats.active_allocations++;
         g_heap_stats.slab_allocations++;
 
-        void *user_ptr = (void *)(header + 1);
-
-        if (flags & GFP_ZERO) {
-            memset(user_ptr, 0, size);
-        }
-
-        return user_ptr;
+        user_ptr = (void *)(header + 1);
     } else {
         /* Large allocation: allocate whole pages directly from PMM */
         size_t total_needed = sizeof(struct alloc_header) + size;
@@ -111,6 +110,7 @@ void *kmalloc(size_t size, uint32_t flags)
 
         uintptr_t phys = pmm_alloc_pages(pages);
         if (!phys) {
+            spin_unlock_irqrestore(&heap_lock, irq_flags);
             return NULL; /* OOM */
         }
 
@@ -123,14 +123,16 @@ void *kmalloc(size_t size, uint32_t flags)
         g_heap_stats.active_allocations++;
         g_heap_stats.large_allocations++;
 
-        void *user_ptr = (void *)(header + 1);
-
-        if (flags & GFP_ZERO) {
-            memset(user_ptr, 0, size);
-        }
-
-        return user_ptr;
+        user_ptr = (void *)(header + 1);
     }
+
+    spin_unlock_irqrestore(&heap_lock, irq_flags);
+
+    if (user_ptr && (flags & GFP_ZERO)) {
+        memset(user_ptr, 0, size);
+    }
+
+    return user_ptr;
 }
 
 void *kzalloc(size_t size, uint32_t flags)
@@ -144,9 +146,12 @@ void kfree(void *ptr)
         return;
     }
 
+    uint64_t irq_flags = spin_lock_irqsave(&heap_lock);
+
     struct alloc_header *header = ((struct alloc_header *)ptr) - 1;
 
     if (header->magic != ALLOC_MAGIC) {
+        spin_unlock_irqrestore(&heap_lock, irq_flags);
         printk("<0>[HEAP CORRUPTION] Invalid magic 0x%x at %p in kfree\n", header->magic, ptr);
         panic("Heap corruption or double free detected!");
     }
@@ -171,6 +176,8 @@ void kfree(void *ptr)
         uintptr_t phys = vmm_virt_to_phys_direct(header);
         pmm_free_pages(phys, pages);
     }
+
+    spin_unlock_irqrestore(&heap_lock, irq_flags);
 }
 
 void *krealloc(void *ptr, size_t new_size, uint32_t flags)
@@ -225,9 +232,20 @@ void *kmalloc_aligned(size_t size, size_t alignment, uint32_t flags)
     return (void *)aligned_addr;
 }
 
+void kfree_aligned(void *ptr)
+{
+    if (!ptr) {
+        return;
+    }
+    void **store = (void **)ptr - 1;
+    kfree(*store);
+}
+
 void heap_get_stats(struct heap_stats *stats)
 {
     if (stats) {
+        uint64_t irq_flags = spin_lock_irqsave(&heap_lock);
         *stats = g_heap_stats;
+        spin_unlock_irqrestore(&heap_lock, irq_flags);
     }
 }

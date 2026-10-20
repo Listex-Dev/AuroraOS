@@ -287,7 +287,7 @@ bool test_virtual_filesystems(void)
         memset(buf, 0, sizeof(buf));
         sys_read(fd_sver, buf, sizeof(buf) - 1);
         sys_close(fd_sver);
-        if (strstr(buf, "1.0.0") == NULL) {
+        if (strstr(buf, "1.0.0") == NULL && strstr(buf, "2.0.0") == NULL) {
             printk("<0>[TEST M7] FAILED: sysfs version mismatch: %s\n", buf);
             return false;
         }

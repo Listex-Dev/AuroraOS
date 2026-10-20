@@ -25,24 +25,75 @@
 
 #define MODULE_ADDR_START 0xFFFFFFFF88000000ULL
 #define MODULE_ADDR_END   0xFFFFFFFF90000000ULL
+#define MODULE_MAX_PAGES  ((MODULE_ADDR_END - MODULE_ADDR_START) / PAGE_SIZE)
 
-static uint64_t g_module_next_vaddr = MODULE_ADDR_START;
+static uint8_t g_module_bitmap[MODULE_MAX_PAGES / 8];
+
+static inline bool mod_bitmap_test(size_t bit)
+{
+    return (g_module_bitmap[bit / 8] & (1 << (bit % 8))) != 0;
+}
+
+static inline void mod_bitmap_set(size_t bit)
+{
+    g_module_bitmap[bit / 8] |= (1 << (bit % 8));
+}
+
+static inline void mod_bitmap_clear(size_t bit)
+{
+    g_module_bitmap[bit / 8] &= ~(1 << (bit % 8));
+}
 
 void *module_alloc(size_t size)
 {
     size_t pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-    if (pages == 0) return NULL;
-    if (g_module_next_vaddr + pages * PAGE_SIZE > MODULE_ADDR_END) {
+    if (pages == 0 || pages > MODULE_MAX_PAGES) return NULL;
+
+    size_t consecutive = 0;
+    size_t start_bit = 0;
+    bool found = false;
+
+    for (size_t i = 0; i < MODULE_MAX_PAGES; i++) {
+        if (!mod_bitmap_test(i)) {
+            if (consecutive == 0) {
+                start_bit = i;
+            }
+            consecutive++;
+            if (consecutive == pages) {
+                found = true;
+                break;
+            }
+        } else {
+            consecutive = 0;
+        }
+    }
+
+    if (!found) {
         return NULL;
     }
 
-    uint64_t vaddr = g_module_next_vaddr;
-    g_module_next_vaddr += pages * PAGE_SIZE;
+    for (size_t i = 0; i < pages; i++) {
+        mod_bitmap_set(start_bit + i);
+    }
 
+    uint64_t vaddr = MODULE_ADDR_START + start_bit * PAGE_SIZE;
     uint64_t *pml4 = vmm_get_kernel_pml4();
+
     for (size_t i = 0; i < pages; i++) {
         uintptr_t phys = pmm_alloc_page();
         if (!phys) {
+            /* Cleanup already allocated and mapped pages */
+            for (size_t j = 0; j < i; j++) {
+                uint64_t cur = vaddr + j * PAGE_SIZE;
+                uint64_t p = vmm_virt_to_phys(pml4, cur);
+                vmm_unmap_page(pml4, cur);
+                if (p) {
+                    pmm_free_page(p & PAGE_MASK);
+                }
+            }
+            for (size_t j = 0; j < pages; j++) {
+                mod_bitmap_clear(start_bit + j);
+            }
             return NULL;
         }
         memset(vmm_phys_to_virt(phys), 0, PAGE_SIZE);
@@ -56,6 +107,9 @@ void module_free(void *ptr, size_t size)
     if (!ptr || size == 0) return;
     size_t pages = (size + PAGE_SIZE - 1) / PAGE_SIZE;
     uint64_t vaddr = (uint64_t)(uintptr_t)ptr;
+    if (vaddr < MODULE_ADDR_START || vaddr >= MODULE_ADDR_END) return;
+
+    size_t start_bit = (vaddr - MODULE_ADDR_START) / PAGE_SIZE;
     uint64_t *pml4 = vmm_get_kernel_pml4();
 
     for (size_t i = 0; i < pages; i++) {
@@ -64,6 +118,9 @@ void module_free(void *ptr, size_t size)
         vmm_unmap_page(pml4, cur);
         if (phys) {
             pmm_free_page(phys & PAGE_MASK);
+        }
+        if (start_bit + i < MODULE_MAX_PAGES) {
+            mod_bitmap_clear(start_bit + i);
         }
     }
 }
@@ -359,6 +416,11 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
                 case R_X86_64_PC32:
                 case R_X86_64_PLT32: {
                     int64_t val = (int64_t)(sym_val + relas[r].r_addend) - (int64_t)loc;
+                    if (val < -0x80000000LL || val > 0x7FFFFFFFLL) {
+                        printk("<3>[LKM] Relocation overflow for PC32/PLT32: offset %lld out of 32-bit range\n", (long long)val);
+                        module_free(core_mem, total_alloc_size);
+                        return -ENOEXEC;
+                    }
                     *(uint32_t *)loc = (uint32_t)val;
                     break;
                 }

@@ -1,12 +1,9 @@
 /*
  * AuroraOS Fast Syscall Entry for x86-64
  * Handles 'syscall' instruction via MSR_LSTAR and returns to Ring 3 via iretq
+ * Saves user RSP in the architecture-defined TSS rsp1 slot (offset 12),
+ * avoiding any shared static scratch variables in .data.
  */
-
-.section .data
-.align 16
-user_rsp_scratch:
-    .quad 0
 
 .section .text
 .global syscall_entry
@@ -17,13 +14,13 @@ user_rsp_scratch:
 .extern syscall_save_regs
 
 syscall_entry:
-    /* 1. Save user RSP and switch to per-task kernel stack */
-    movq %rsp, user_rsp_scratch(%rip)
+    /* 1. Save user RSP to TSS rsp1 (offset 12) and switch to per-task kernel stack */
+    movq %rsp, kernel_tss+12(%rip)
     movq kernel_tss+4(%rip), %rsp
 
     /* 2. Construct struct pt_regs on kernel stack */
     pushq $0x1B                    /* ss (User SS 0x18 | 3) */
-    pushq user_rsp_scratch(%rip)   /* rsp (User RSP) */
+    pushq kernel_tss+12(%rip)      /* rsp (User RSP saved in TSS rsp1) */
     pushq %r11                     /* rflags (User RFLAGS saved by syscall) */
     pushq $0x23                    /* cs (User CS 0x20 | 3) */
     pushq %rcx                     /* rip (User RIP saved by syscall) */

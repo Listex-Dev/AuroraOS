@@ -2,6 +2,7 @@
 #include <aurora/bootinfo.h>
 #include <aurora/printk.h>
 #include <aurora/string.h>
+#include <aurora/sync/spinlock.h>
 
 extern char kernel_end_phys[];
 
@@ -12,6 +13,7 @@ static size_t total_memory_pages = 0;
 static size_t free_page_count = 0;
 static size_t used_page_count = 0;
 static size_t last_search_idx = 0;
+static spinlock_t pmm_lock = SPINLOCK_INIT;
 
 static inline void *phys_to_virt(uint64_t phys)
 {
@@ -128,7 +130,7 @@ void pmm_init(void)
            (unsigned long long)((used_page_count * PAGE_SIZE) / (1024 * 1024)));
 }
 
-uintptr_t pmm_alloc_page(void)
+static uintptr_t pmm_alloc_page_unlocked(void)
 {
     for (size_t i = 0; i < total_memory_pages; i++) {
         size_t idx = (last_search_idx + i) % total_memory_pages;
@@ -143,13 +145,26 @@ uintptr_t pmm_alloc_page(void)
     return 0; /* Out of physical memory */
 }
 
+uintptr_t pmm_alloc_page(void)
+{
+    uint64_t flags = spin_lock_irqsave(&pmm_lock);
+    uintptr_t ret = pmm_alloc_page_unlocked();
+    spin_unlock_irqrestore(&pmm_lock, flags);
+    return ret;
+}
+
 uintptr_t pmm_alloc_pages(size_t count)
 {
     if (count == 0) {
         return 0;
     }
+
+    uint64_t flags = spin_lock_irqsave(&pmm_lock);
+
     if (count == 1) {
-        return pmm_alloc_page();
+        uintptr_t ret = pmm_alloc_page_unlocked();
+        spin_unlock_irqrestore(&pmm_lock, flags);
+        return ret;
     }
 
     size_t consecutive = 0;
@@ -167,6 +182,7 @@ uintptr_t pmm_alloc_pages(size_t count)
                 }
                 free_page_count -= count;
                 used_page_count += count;
+                spin_unlock_irqrestore(&pmm_lock, flags);
                 return (uintptr_t)(start_idx * PAGE_SIZE);
             }
         } else {
@@ -174,10 +190,11 @@ uintptr_t pmm_alloc_pages(size_t count)
         }
     }
 
+    spin_unlock_irqrestore(&pmm_lock, flags);
     return 0; /* Not enough contiguous physical memory */
 }
 
-void pmm_free_page(uintptr_t phys_addr)
+static void pmm_free_page_unlocked(uintptr_t phys_addr)
 {
     if (phys_addr % PAGE_SIZE != 0) {
         return;
@@ -194,19 +211,30 @@ void pmm_free_page(uintptr_t phys_addr)
     }
 }
 
+void pmm_free_page(uintptr_t phys_addr)
+{
+    uint64_t flags = spin_lock_irqsave(&pmm_lock);
+    pmm_free_page_unlocked(phys_addr);
+    spin_unlock_irqrestore(&pmm_lock, flags);
+}
+
 void pmm_free_pages(uintptr_t phys_addr, size_t count)
 {
+    uint64_t flags = spin_lock_irqsave(&pmm_lock);
     for (size_t i = 0; i < count; i++) {
-        pmm_free_page(phys_addr + (i * PAGE_SIZE));
+        pmm_free_page_unlocked(phys_addr + (i * PAGE_SIZE));
     }
+    spin_unlock_irqrestore(&pmm_lock, flags);
 }
 
 void pmm_get_stats(struct pmm_stats *stats)
 {
     if (stats) {
+        uint64_t flags = spin_lock_irqsave(&pmm_lock);
         stats->total_pages = total_memory_pages;
         stats->free_pages = free_page_count;
         stats->used_pages = used_page_count;
         stats->reserved_pages = total_memory_pages - free_page_count;
+        spin_unlock_irqrestore(&pmm_lock, flags);
     }
 }

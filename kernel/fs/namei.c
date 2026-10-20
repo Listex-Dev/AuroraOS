@@ -1,4 +1,5 @@
 #include <aurora/fs/vfs.h>
+#include <aurora/fs/mount.h>
 #include <aurora/proc/sched.h>
 #include <aurora/string.h>
 
@@ -51,7 +52,12 @@ struct dentry *vfs_namei(const char *path)
         if (strcmp(comp, ".") == 0) {
             continue;
         } else if (strcmp(comp, "..") == 0) {
-            curr = curr->d_parent;
+            struct dentry *mp = vfs_get_mountpoint_for_root(curr);
+            if (mp) {
+                curr = mp->d_parent;
+            } else {
+                curr = curr->d_parent;
+            }
         } else {
             struct dentry *next = dentry_lookup(curr, comp);
             if (!next) {
