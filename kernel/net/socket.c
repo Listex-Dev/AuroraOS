@@ -365,6 +365,9 @@ int64_t sys_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     if (!addr) {
         return -EFAULT;
     }
+    if (addr->sa_family != AF_INET) {
+        return -EAFNOSUPPORT;
+    }
 
     const struct sockaddr_in *sin = (const struct sockaddr_in *)addr;
     uint16_t port = net_ntohs(sin->sin_port);
@@ -471,6 +474,9 @@ int64_t sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     if (!addr) {
         return -EFAULT;
     }
+    if (addr->sa_family != AF_INET) {
+        return -EAFNOSUPPORT;
+    }
 
     const struct sockaddr_in *sin = (const struct sockaddr_in *)addr;
     uint32_t dst_ip = sin->sin_addr.s_addr;
@@ -500,6 +506,9 @@ int64_t sys_sendto(int sockfd, const void *buf, size_t len, int flags,
     }
 
     if (dest_addr) {
+        if (dest_addr->sa_family != AF_INET) {
+            return -EAFNOSUPPORT;
+        }
         const struct sockaddr_in *sin = (const struct sockaddr_in *)dest_addr;
         uint32_t dst_ip = sin->sin_addr.s_addr;
         uint16_t dst_port = net_ntohs(sin->sin_port);

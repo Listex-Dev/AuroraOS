@@ -245,8 +245,14 @@ struct linux_dirent64 {
 
 int64_t sys_getdents64(int fd, void *dirp, size_t count)
 {
-    if (fd < 0 || fd >= NR_OPEN || !dirp || count == 0) {
+    if (fd < 0 || fd >= NR_OPEN) {
         return -EBADF;
+    }
+    if (!dirp) {
+        return -EFAULT;
+    }
+    if (count == 0) {
+        return -EINVAL;
     }
 
     struct files_struct *files = get_current_files();
@@ -429,7 +435,7 @@ int64_t sys_uname(struct utsname *buf)
     memset(buf, 0, sizeof(struct utsname));
     strncpy(buf->sysname, "AuroraOS", 64);
     strncpy(buf->nodename, "aurora", 64);
-    strncpy(buf->release, "1.0.0", 64);
+    strncpy(buf->release, "2.0.0", 64);
     strncpy(buf->version, "#1 AuroraOS x86-64 Monolithic", 64);
     strncpy(buf->machine, "x86_64", 64);
     strncpy(buf->domainname, "(none)", 64);
@@ -495,6 +501,7 @@ static int pipe_release(struct inode *inode, struct file *file)
         if (pipe->readers <= 0 && pipe->writers <= 0) {
             kfree(pipe);
             inode->i_private = NULL;
+            kfree(inode);
         }
     }
     return 0;

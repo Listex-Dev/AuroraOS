@@ -305,6 +305,10 @@ int tcp_receive(struct netdev *dev, uint32_t src_ip, uint32_t dst_ip, netbuf_t *
     if (!matched && listener) {
         /* Incoming connection request to listener */
         if (flags & TCP_FLAG_SYN) {
+            if (listener->accept_count >= 16) {
+                netbuf_free(nb);
+                return 0;
+            }
             /* Create new child socket */
             struct socket *child = socket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
             if (child) {
@@ -322,11 +326,9 @@ int tcp_receive(struct netdev *dev, uint32_t src_ip, uint32_t dst_ip, netbuf_t *
                 child->snd_nxt++;
 
                 /* Enqueue in parent accept queue */
-                if (listener->accept_count < 16) {
-                    listener->accept_queue[listener->accept_head] = child;
-                    listener->accept_head = (listener->accept_head + 1) % 16;
-                    listener->accept_count++;
-                }
+                listener->accept_queue[listener->accept_head] = child;
+                listener->accept_head = (listener->accept_head + 1) % 16;
+                listener->accept_count++;
             }
         }
         netbuf_free(nb);

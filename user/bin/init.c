@@ -240,15 +240,18 @@ int main(int argc, char **argv)
             }
 
             int status = 0;
-            pid_t reaped = waitpid(-1, &status, WNOHANG);
-
-            if (reaped > 0) {
+            pid_t reaped;
+            bool reaped_any = false;
+            while ((reaped = waitpid(-1, &status, WNOHANG)) > 0) {
+                reaped_any = true;
                 if (reaped == g_getty_pid && g_current_runlevel == 3) {
                     printf("init: getty (PID %d) exited, respawning...\n", reaped);
                     sleep(1);
                     g_getty_pid = spawn_getty("/dev/console");
                 }
-            } else {
+            }
+
+            if (!reaped_any) {
                 sleep(1);
             }
         }

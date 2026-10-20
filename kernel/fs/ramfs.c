@@ -174,7 +174,9 @@ static int ramfs_dir_unlink(struct inode *dir, struct dentry *dentry)
         inode->i_private = NULL;
     }
 
+    struct inode *del_inode = inode;
     dentry_free(dentry);
+    inode_free(del_inode);
     return 0;
 }
 

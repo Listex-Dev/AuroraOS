@@ -5,6 +5,8 @@
 #include <aurora/errno.h>
 #include <aurora/string.h>
 
+#define USER_BRK_MAX 0x0000700000000000ULL
+
 int64_t sys_brk(uintptr_t new_brk)
 {
     task_t *curr = sched_current();
@@ -16,7 +18,7 @@ int64_t sys_brk(uintptr_t new_brk)
         return (int64_t)curr->brk_current;
     }
 
-    if (new_brk < curr->brk_start) {
+    if (new_brk < curr->brk_start || new_brk >= USER_BRK_MAX) {
         return -EINVAL;
     }
 
@@ -29,6 +31,14 @@ int64_t sys_brk(uintptr_t new_brk)
         for (uint64_t v = start_page; v < end_page; v += PAGE_SIZE) {
             uintptr_t phys = pmm_alloc_page();
             if (!phys) {
+                /* Rollback any partially allocated pages to prevent leak */
+                for (uint64_t rollback = start_page; rollback < v; rollback += PAGE_SIZE) {
+                    uint64_t p = vmm_virt_to_phys(pml4, rollback);
+                    vmm_unmap_page(pml4, rollback);
+                    if (p) {
+                        pmm_free_page(p & PAGE_MASK);
+                    }
+                }
                 return -ENOMEM;
             }
             memset(vmm_phys_to_virt(phys), 0, PAGE_SIZE);

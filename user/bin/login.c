@@ -156,7 +156,7 @@ int main(int argc, char **argv)
         }
         fclose(motd);
     } else {
-        printf("\nWelcome to AuroraOS 1.0.0!\nAll systems operating in 64-bit Long Mode.\n\n");
+        printf("\nWelcome to AuroraOS 2.0 Ultra!\nAll systems operating in 64-bit Long Mode.\n\n");
     }
     fflush(stdout);
 

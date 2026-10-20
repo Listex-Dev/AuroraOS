@@ -100,6 +100,9 @@ void free(void *ptr)
     if (!ptr) return;
 
     struct chunk *c = (struct chunk *)((char *)ptr - CHUNK_HEADER_SIZE);
+    if (!(c->size & CHUNK_IN_USE)) {
+        return; /* Prevent double-free list corruption */
+    }
     c->size &= CHUNK_SIZE_MASK; /* mark as free */
 
     /* Add to free list */

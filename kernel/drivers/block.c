@@ -206,7 +206,7 @@ int bdev_read(struct block_device *bdev, uint64_t lba, uint32_t count, void *buf
     if (!bdev || !bdev->ops || !bdev->ops->read_blocks || !buffer) {
         return -EINVAL;
     }
-    if (lba + count > bdev->total_blocks) {
+    if (count > bdev->total_blocks || lba > bdev->total_blocks - count) {
         return -EIO;
     }
     return bdev->ops->read_blocks(bdev, lba, count, buffer);
@@ -217,7 +217,7 @@ int bdev_write(struct block_device *bdev, uint64_t lba, uint32_t count, const vo
     if (!bdev || !bdev->ops || !bdev->ops->write_blocks || !buffer) {
         return -EINVAL;
     }
-    if (lba + count > bdev->total_blocks) {
+    if (count > bdev->total_blocks || lba > bdev->total_blocks - count) {
         return -EIO;
     }
     return bdev->ops->write_blocks(bdev, lba, count, buffer);

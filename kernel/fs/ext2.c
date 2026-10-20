@@ -1012,7 +1012,11 @@ static int ext2_dir_unlink(struct inode *dir, struct dentry *dentry)
     }
 
     ext2_sync_metadata(fs);
+    struct inode *del_inode = dentry->d_inode;
     dentry_free(dentry);
+    if (del_inode) {
+        inode_free(del_inode);
+    }
     return 0;
 }
 
@@ -1043,8 +1047,19 @@ static void ext2_vfs_write_inode(struct inode *inode)
     ext2_sync_metadata(fs);
 }
 
+static void ext2_vfs_destroy_inode(struct inode *inode)
+{
+    if (!inode) return;
+    if (inode->i_private) {
+        kfree(inode->i_private);
+        inode->i_private = NULL;
+    }
+    kfree(inode);
+}
+
 static struct super_operations ext2_super_ops = {
     .write_inode = ext2_vfs_write_inode,
+    .destroy_inode = ext2_vfs_destroy_inode,
 };
 
 struct super_block *ext2_mount(struct block_device *bdev)

@@ -278,7 +278,12 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
         return -ENOEXEC;
     }
 
-    if (eh->e_shoff + eh->e_shnum * sizeof(Elf64_Shdr) > len) {
+    if (eh->e_shnum == 0 || eh->e_shnum > 128) {
+        printk("<3>[LKM] Module section count %u exceeds maximum supported 128\n", eh->e_shnum);
+        return -ENOEXEC;
+    }
+
+    if (eh->e_shoff > len || eh->e_shnum * sizeof(Elf64_Shdr) > len - eh->e_shoff) {
         return -EINVAL;
     }
 
@@ -286,6 +291,10 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
 
     /* Locate section header string table */
     if (eh->e_shstrndx >= eh->e_shnum) {
+        return -ENOEXEC;
+    }
+    if (shdrs[eh->e_shstrndx].sh_offset > len ||
+        shdrs[eh->e_shstrndx].sh_size > len - shdrs[eh->e_shstrndx].sh_offset) {
         return -ENOEXEC;
     }
     const char *shstrtab = (const char *)(raw + shdrs[eh->e_shstrndx].sh_offset);
@@ -353,6 +362,12 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
         return -ENOEXEC;
     }
 
+    if (symtab_sh->sh_offset > len || symtab_sh->sh_size > len - symtab_sh->sh_offset ||
+        strtab_sh->sh_offset > len || strtab_sh->sh_size > len - strtab_sh->sh_offset) {
+        module_free(core_mem, total_alloc_size);
+        return -ENOEXEC;
+    }
+
     const Elf64_Sym *syms = (const Elf64_Sym *)(raw + symtab_sh->sh_offset);
     uint32_t num_syms = symtab_sh->sh_size / sizeof(Elf64_Sym);
     const char *strtab = (const char *)(raw + strtab_sh->sh_offset);
@@ -368,6 +383,11 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
             continue;
         }
 
+        if (shdrs[i].sh_offset > len || shdrs[i].sh_size > len - shdrs[i].sh_offset) {
+            module_free(core_mem, total_alloc_size);
+            return -ENOEXEC;
+        }
+
         uint64_t target_sec_addr = sec_load_addrs[target_sec_idx];
         const Elf64_Rela *relas = (const Elf64_Rela *)(raw + shdrs[i].sh_offset);
         uint32_t num_relas = shdrs[i].sh_size / sizeof(Elf64_Rela);
@@ -377,6 +397,13 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
             uint32_t rel_type = (uint32_t)ELF64_R_TYPE(relas[r].r_info);
 
             if (sym_idx >= num_syms) {
+                module_free(core_mem, total_alloc_size);
+                return -ENOEXEC;
+            }
+
+            if (relas[r].r_offset + sizeof(uint32_t) > shdrs[target_sec_idx].sh_size) {
+                printk("<3>[LKM] Relocation offset 0x%llx exceeds section size 0x%llx\n",
+                       (unsigned long long)relas[r].r_offset, (unsigned long long)shdrs[target_sec_idx].sh_size);
                 module_free(core_mem, total_alloc_size);
                 return -ENOEXEC;
             }
@@ -405,6 +432,10 @@ int64_t sys_init_module(void *umod, unsigned long len, const char *uargs)
                 case R_X86_64_NONE:
                     break;
                 case R_X86_64_64:
+                    if (relas[r].r_offset + sizeof(uint64_t) > shdrs[target_sec_idx].sh_size) {
+                        module_free(core_mem, total_alloc_size);
+                        return -ENOEXEC;
+                    }
                     *(uint64_t *)loc = sym_val + relas[r].r_addend;
                     break;
                 case R_X86_64_32:

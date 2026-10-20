@@ -36,6 +36,9 @@ static ssize_t proc_file_read(struct file *file, void *buf, size_t count, uint64
     if (total <= 0) {
         return 0;
     }
+    if (total > (ssize_t)sizeof(kbuf)) {
+        total = (ssize_t)sizeof(kbuf);
+    }
 
     if (*pos >= (uint64_t)total) {
         return 0; /* EOF */
@@ -236,41 +239,47 @@ static ssize_t gen_self_cmdline(char *buf, size_t max_len)
 static ssize_t gen_net_dev(char *buf, size_t max_len)
 {
     size_t off = 0;
-    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                    "Inter-|   Receive                                                |  Transmit\n"
-                    " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n");
+    int len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "Inter-|   Receive                                                |  Transmit\n"
+                       " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n");
+    if (len > 0) off += (size_t)len;
 
     for (struct netdev *dev = netdev_get_list(); dev != NULL; dev = dev->next) {
-        off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                        "%6s: %8llu %7llu %4llu %4llu    0     0          0         0 %8llu %7llu %4llu %4llu     0     0       0          0\n",
-                        dev->name,
-                        dev->stats.rx_bytes, dev->stats.rx_packets, dev->stats.rx_errors, dev->stats.rx_dropped,
-                        dev->stats.tx_bytes, dev->stats.tx_packets, dev->stats.tx_errors, dev->stats.tx_dropped);
+        if (off >= max_len) break;
+        len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "%6s: %8llu %7llu %4llu %4llu    0     0          0         0 %8llu %7llu %4llu %4llu     0     0       0          0\n",
+                       dev->name,
+                       dev->stats.rx_bytes, dev->stats.rx_packets, dev->stats.rx_errors, dev->stats.rx_dropped,
+                       dev->stats.tx_bytes, dev->stats.tx_packets, dev->stats.tx_errors, dev->stats.tx_dropped);
+        if (len > 0) off += (size_t)len;
     }
-    return (ssize_t)off;
+    return (ssize_t)(off > max_len ? max_len : off);
 }
 
 static ssize_t gen_net_arp(char *buf, size_t max_len)
 {
     size_t off = 0;
-    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                    "IP address       HW type     Flags       HW address            Mask     Device\n");
+    int len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "IP address       HW type     Flags       HW address            Mask     Device\n");
+    if (len > 0) off += (size_t)len;
 
     const struct arp_entry *table = arp_get_table();
     if (table) {
         for (int i = 0; i < ARP_TABLE_SIZE; i++) {
+            if (off >= max_len) break;
             if (table[i].valid) {
                 uint32_t ip = net_ntohl(table[i].ip);
-                off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                                "%u.%u.%u.%u      0x1         0x%x         %02x:%02x:%02x:%02x:%02x:%02x     *        eth0\n",
-                                (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF,
-                                table[i].flags,
-                                table[i].mac[0], table[i].mac[1], table[i].mac[2],
-                                table[i].mac[3], table[i].mac[4], table[i].mac[5]);
+                len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                               "%u.%u.%u.%u      0x1         0x%x         %02x:%02x:%02x:%02x:%02x:%02x     *        eth0\n",
+                               (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF,
+                               table[i].flags,
+                               table[i].mac[0], table[i].mac[1], table[i].mac[2],
+                               table[i].mac[3], table[i].mac[4], table[i].mac[5]);
+                if (len > 0) off += (size_t)len;
             }
         }
     }
-    return (ssize_t)off;
+    return (ssize_t)(off > max_len ? max_len : off);
 }
 
 static ssize_t gen_net_route(char *buf, size_t max_len)
@@ -284,11 +293,13 @@ static ssize_t gen_net_route(char *buf, size_t max_len)
 static ssize_t gen_net_tcp(char *buf, size_t max_len)
 {
     size_t off = 0;
-    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+    int len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+    if (len > 0) off += (size_t)len;
 
     int slot = 0;
     for (struct socket *s = tcp_get_socket_list(); s != NULL; s = s->next) {
+        if (off >= max_len) break;
         int st_hex = 0x07;
         switch (s->state) {
             case TCP_LISTEN:        st_hex = 0x0A; break;
@@ -309,31 +320,35 @@ static ssize_t gen_net_tcp(char *buf, size_t max_len)
         uint32_t rip = s->remote_ip;
         uint16_t rport = s->remote_port;
 
-        off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                        "%4d: %08X:%04X %08X:%04X %02X %08X:%08X 00:00000000 00000000     0        0 0 1 0000000000000000 100 0 0 10 0\n",
-                        slot++, lip, lport, rip, rport, st_hex, 0, s->rx_count);
+        len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "%4d: %08X:%04X %08X:%04X %02X %08X:%08X 00:00000000 00000000     0        0 0 1 0000000000000000 100 0 0 10 0\n",
+                       slot++, lip, lport, rip, rport, st_hex, 0, s->rx_count);
+        if (len > 0) off += (size_t)len;
     }
-    return (ssize_t)off;
+    return (ssize_t)(off > max_len ? max_len : off);
 }
 
 static ssize_t gen_net_udp(char *buf, size_t max_len)
 {
     size_t off = 0;
-    off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+    int len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n");
+    if (len > 0) off += (size_t)len;
 
     int slot = 0;
     for (struct socket *s = udp_get_socket_list(); s != NULL; s = s->next) {
+        if (off >= max_len) break;
         uint32_t lip = s->local_ip;
         uint16_t lport = s->local_port;
         uint32_t rip = s->remote_ip;
         uint16_t rport = s->remote_port;
 
-        off += snprintf(buf + off, max_len > off ? max_len - off : 0,
-                        "%4d: %08X:%04X %08X:%04X 07 %08X:%08X 00:00000000 00000000     0        0 0 2 0000000000000000 100 0 0 10 0\n",
-                        slot++, lip, lport, rip, rport, 0, s->rx_count);
+        len = snprintf(buf + off, max_len > off ? max_len - off : 0,
+                       "%4d: %08X:%04X %08X:%04X 07 %08X:%08X 00:00000000 00000000     0        0 0 2 0000000000000000 100 0 0 10 0\n",
+                       slot++, lip, lport, rip, rport, 0, s->rx_count);
+        if (len > 0) off += (size_t)len;
     }
-    return (ssize_t)off;
+    return (ssize_t)(off > max_len ? max_len : off);
 }
 
 static void create_proc_file(struct super_block *sb, struct dentry *parent, const char *name, proc_read_fn fn)

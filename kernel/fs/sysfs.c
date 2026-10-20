@@ -39,6 +39,9 @@ static ssize_t sysfs_file_read(struct file *file, void *buf, size_t count, uint6
     if (total <= 0) {
         return 0;
     }
+    if (total > (ssize_t)sizeof(kbuf)) {
+        total = (ssize_t)sizeof(kbuf);
+    }
 
     if (*pos >= (uint64_t)total) {
         return 0;

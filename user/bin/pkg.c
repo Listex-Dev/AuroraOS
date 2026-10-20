@@ -183,9 +183,11 @@ static int cmd_install(const char *pkg_path)
         }
 
         printf("      -> %s (mode %04o, %u bytes)\n", fi.path, fi.mode, fi.size);
-        strcat(installed_files_list, "  ");
-        strcat(installed_files_list, fi.path);
-        strcat(installed_files_list, "\n");
+        if (strlen(installed_files_list) + strlen(fi.path) + 4 < sizeof(installed_files_list)) {
+            strcat(installed_files_list, "  ");
+            strcat(installed_files_list, fi.path);
+            strcat(installed_files_list, "\n");
+        }
     }
     close(fd);
 
