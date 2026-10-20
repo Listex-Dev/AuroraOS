@@ -590,6 +590,7 @@ int64_t sys_kill(pid_t pid, int sig)
         /* Signal process group */
         pid_t pgrp = -pid;
         int count = 0;
+        bool self_killed = false;
         for (size_t i = 0; i < sched_num_tasks(); i++) {
             task_t *t = sched_get_task_at(i);
             if (t && t->pid != 1 && (pid == -1 || t->pgid == pgrp) && t->state != TASK_ZOMBIE && t->state != TASK_DEAD) {
@@ -597,11 +598,15 @@ int64_t sys_kill(pid_t pid, int sig)
                     printk("<6>[SIGNAL] Sent signal %d to PID %d ('%s', pgrp %d)\n",
                            sig, t->pid, t->comm, pgrp);
                     if (sig == SIGKILL || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT) {
-                        t->exit_code = 128 + sig;
-                        t->state = TASK_ZOMBIE;
-                        if (t->files) {
-                            files_free((struct files_struct *)t->files);
-                            t->files = NULL;
+                        if (t == sched_current()) {
+                            self_killed = true;
+                        } else {
+                            t->exit_code = 128 + sig;
+                            t->state = TASK_ZOMBIE;
+                            if (t->files) {
+                                files_free((struct files_struct *)t->files);
+                                t->files = NULL;
+                            }
                         }
                     } else if (sig == SIGSTOP || sig == SIGTSTP) {
                         t->exit_code = 128 + sig;
@@ -614,6 +619,9 @@ int64_t sys_kill(pid_t pid, int sig)
                 }
                 count++;
             }
+        }
+        if (self_killed) {
+            sys_exit(128 + sig);
         }
         return count > 0 ? 0 : -ESRCH;
     }
@@ -642,6 +650,9 @@ int64_t sys_kill(pid_t pid, int sig)
 
     /* Default terminating signals: terminate target and set zombie status */
     if (sig == SIGKILL || sig == SIGTERM || sig == SIGINT || sig == SIGQUIT || sig == SIGABRT) {
+        if (target == sched_current()) {
+            sys_exit(128 + sig);
+        }
         target->exit_code = 128 + sig;
         target->state = TASK_ZOMBIE;
         if (target->files) {
