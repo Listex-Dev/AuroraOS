@@ -86,57 +86,45 @@ void security_subsys_init(void)
     sys_mkdir("/var", 0755);
     sys_mkdir("/var/log", 0755);
 
-    int fd = sys_open("/etc/issue", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        const char *issue = "\n\033[1;36mAuroraOS 1.0.0 (x86_64)\033[0m\n\n";
-        sys_write(fd, issue, strlen(issue));
-        sys_close(fd);
-    }
+    #define WRITE_IF_MISSING(path, content, mode) do { \
+        int _f = sys_open((path), O_RDONLY, 0); \
+        if (_f >= 0) { \
+            sys_close(_f); \
+        } else { \
+            _f = sys_open((path), O_WRONLY | O_CREAT | O_TRUNC, (mode)); \
+            if (_f >= 0) { \
+                sys_write(_f, (content), strlen(content)); \
+                sys_close(_f); \
+            } \
+        } \
+    } while (0)
 
-    fd = sys_open("/etc/motd", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        const char *motd = "\n\033[1;32mWelcome to AuroraOS 1.0.0!\033[0m\n"
-                           "All systems operating in 64-bit Long Mode.\n"
-                           "Available commands: ls, ps, cat, cp, vi, grep, fdisk, mount, sh.\n\n";
-        sys_write(fd, motd, strlen(motd));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/issue", "\n\033[1;36mAuroraOS 2.0 (x86_64)\033[0m\n\n", 0644);
 
-    fd = sys_open("/etc/passwd", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        const char *pw = "root:x:0:0:root:/root:/bin/sh\n"
-                         "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
-                         "aurora:x:1000:1000:Aurora User:/home/aurora:/bin/sh\n";
-        sys_write(fd, pw, strlen(pw));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/motd",
+                     "\n\033[1;32mWelcome to AuroraOS 2.0!\033[0m\n"
+                     "All systems operating in 64-bit Long Mode.\n\n", 0644);
 
-    fd = sys_open("/etc/shadow", O_WRONLY | O_CREAT | O_TRUNC, 0640);
-    if (fd >= 0) {
-        const char *sh = "root:$6$saltsalt$FCtXpTmG7SvkmMFnnZIotZMsxPcyMf9rYNlYFfsA2Fau3J9awLnj6tPMJW6qxQdpHAgjs0cvMWQ2Ve2HWIdX2/:19000:0:99999:7:::\n"
-                         "aurora:$6$saltsalt$VcYMCBfELnOcDK8outogXZyOp5rTpzY5E2LZQKa6N.QAElzmqtqwgRygFvpH/3Mcts8sy/gn7EtOsH5Rw/Xw4/:19000:0:99999:7:::\n";
-        sys_write(fd, sh, strlen(sh));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/passwd",
+                     "root:x:0:0:root:/root:/bin/sh\n"
+                     "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
+                     "aurora:x:1000:1000:Aurora User:/home/aurora:/bin/sh\n", 0644);
 
-    fd = sys_open("/etc/group", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd >= 0) {
-        const char *grp = "root:x:0:root\n"
-                          "wheel:x:10:root\n"
-                          "shadow:x:42:root\n"
-                          "tty:x:5:\n"
-                          "disk:x:6:\n"
-                          "users:x:1000:aurora\n";
-        sys_write(fd, grp, strlen(grp));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/shadow",
+                     "root:$6$saltsalt$FCtXpTmG7SvkmMFnnZIotZMsxPcyMf9rYNlYFfsA2Fau3J9awLnj6tPMJW6qxQdpHAgjs0cvMWQ2Ve2HWIdX2/:19000:0:99999:7:::\n"
+                     "aurora:$6$saltsalt$VcYMCBfELnOcDK8outogXZyOp5rTpzY5E2LZQKa6N.QAElzmqtqwgRygFvpH/3Mcts8sy/gn7EtOsH5Rw/Xw4/:19000:0:99999:7:::\n", 0640);
 
-    fd = sys_open("/var/log/auth.log", O_WRONLY | O_CREAT | O_TRUNC, 0640);
-    if (fd >= 0) {
-        const char *auth_init = "System security and audit logging initialized.\n";
-        sys_write(fd, auth_init, strlen(auth_init));
-        sys_close(fd);
-    }
+    WRITE_IF_MISSING("/etc/group",
+                     "root:x:0:root\n"
+                     "wheel:x:10:root,aurora\n"
+                     "shadow:x:42:root\n"
+                     "tty:x:5:\n"
+                     "disk:x:6:\n"
+                     "users:x:1000:aurora\n", 0644);
+
+    WRITE_IF_MISSING("/var/log/auth.log",
+                     "System security and audit logging initialized.\n", 0640);
+    #undef WRITE_IF_MISSING
 }
 
 void services_subsys_init(void)

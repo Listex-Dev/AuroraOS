@@ -24,7 +24,12 @@ static void user_m11_trampoline(void)
 
 static void create_file_with_content(const char *path, const char *content)
 {
-    int fd = sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int fd = sys_open(path, O_RDONLY, 0);
+    if (fd >= 0) {
+        sys_close(fd);
+        return;
+    }
+    fd = sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd >= 0) {
         sys_write(fd, content, strlen(content));
         sys_close(fd);

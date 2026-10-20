@@ -87,20 +87,38 @@ static ssize_t gen_meminfo(char *buf, size_t max_len)
 
 static ssize_t gen_cpuinfo(char *buf, size_t max_len)
 {
+    char vendor[13] = {0};
+    uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
+    __asm__ volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx) : "a"(0));
+    *(uint32_t *)(vendor + 0) = ebx;
+    *(uint32_t *)(vendor + 4) = edx;
+    *(uint32_t *)(vendor + 8) = ecx;
+
+    char brand[49] = {0};
+    __asm__ volatile("cpuid" : "=a"(eax) : "a"(0x80000000));
+    if (eax >= 0x80000004) {
+        uint32_t *bp = (uint32_t *)brand;
+        for (uint32_t i = 0x80000002; i <= 0x80000004; i++) {
+            __asm__ volatile("cpuid" : "=a"(bp[0]), "=b"(bp[1]), "=c"(bp[2]), "=d"(bp[3]) : "a"(i));
+            bp += 4;
+        }
+    } else {
+        snprintf(brand, sizeof(brand), "x86-64 Compatible Processor");
+    }
+
     return snprintf(buf, max_len,
                     "processor       : 0\n"
-                    "vendor_id       : AuthenticAMD\n"
-                    "cpu family      : 15\n"
-                    "model           : 1\n"
-                    "model name      : x86-64 Compatible Processor\n"
-                    "cpu MHz         : 2000.000\n"
-                    "flags           : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 syscall nx lm\n");
+                    "vendor_id       : %s\n"
+                    "cpu family      : 6\n"
+                    "model name      : %s\n"
+                    "flags           : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 syscall nx lm\n",
+                    vendor, brand);
 }
 
 static ssize_t gen_version(char *buf, size_t max_len)
 {
     return snprintf(buf, max_len,
-                    "AuroraOS version 1.0.0 (gcc) #1 SMP x86_64 AuroraOS libc\n");
+                    "AuroraOS version 2.0.0 (gcc) #1 SMP x86_64 AuroraOS libc\n");
 }
 
 static ssize_t gen_uptime(char *buf, size_t max_len)
@@ -130,7 +148,9 @@ static ssize_t gen_filesystems(char *buf, size_t max_len)
                     "nodev\tprocfs\n"
                     "nodev\tdevtmpfs\n"
                     "nodev\ttmpfs\n"
-                    "nodev\tsysfs\n");
+                    "nodev\tsysfs\n"
+                    "\text4\n"
+                    "\text2\n");
 }
 
 static ssize_t gen_devices(char *buf, size_t max_len)

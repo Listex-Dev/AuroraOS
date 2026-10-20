@@ -103,7 +103,7 @@ static ssize_t write_hostname(const char *buf, size_t count)
 
 static ssize_t read_version(char *buf, size_t max_len)
 {
-    return snprintf(buf, max_len, "1.0.0\n");
+    return snprintf(buf, max_len, "2.0.0\n");
 }
 
 static ssize_t read_ostype(char *buf, size_t max_len)
