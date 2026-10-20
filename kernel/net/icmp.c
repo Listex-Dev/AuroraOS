@@ -98,7 +98,11 @@ int icmp_send_echo(uint32_t dst_ip, uint16_t id, uint16_t seq, const void *data,
         s_waiters[slot].received = false;
     }
 
-    return ipv4_send(NULL, dst_ip, IPPROTO_ICMP, nb);
+    int ret = ipv4_send(NULL, dst_ip, IPPROTO_ICMP, nb);
+    if (ret < 0 && slot >= 0) {
+        s_waiters[slot].active = false;
+    }
+    return ret;
 }
 
 #include <aurora/arch/x86_64/pit.h>

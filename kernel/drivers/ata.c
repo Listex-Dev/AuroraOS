@@ -200,6 +200,8 @@ static int part_bdev_read(struct block_device *bdev, uint64_t lba, uint32_t coun
 {
     struct partition_info *pi = (struct partition_info *)bdev->private_data;
     if (!pi || !pi->parent) return -EINVAL;
+    if (count > pi->num_sectors || lba > pi->num_sectors - count) return -EIO;
+    if (lba > UINT64_MAX - pi->lba_start) return -EINVAL;
     return bdev_read(pi->parent, pi->lba_start + lba, count, buffer);
 }
 
@@ -207,6 +209,8 @@ static int part_bdev_write(struct block_device *bdev, uint64_t lba, uint32_t cou
 {
     struct partition_info *pi = (struct partition_info *)bdev->private_data;
     if (!pi || !pi->parent) return -EINVAL;
+    if (count > pi->num_sectors || lba > pi->num_sectors - count) return -EIO;
+    if (lba > UINT64_MAX - pi->lba_start) return -EINVAL;
     return bdev_write(pi->parent, pi->lba_start + lba, count, buffer);
 }
 

@@ -15,7 +15,10 @@ struct ramdisk_priv {
 static int ramdisk_read_blocks(struct block_device *bdev, uint64_t lba, uint32_t count, void *buffer)
 {
     struct ramdisk_priv *priv = (struct ramdisk_priv *)bdev->private_data;
-    if (!priv || !priv->data) return -EINVAL;
+    if (!priv || !priv->data || !buffer) return -EINVAL;
+    if (count > bdev->total_blocks || lba > bdev->total_blocks - count) {
+        return -EIO;
+    }
 
     uint64_t offset = lba * bdev->block_size;
     uint64_t bytes = (uint64_t)count * bdev->block_size;
@@ -31,7 +34,10 @@ static int ramdisk_read_blocks(struct block_device *bdev, uint64_t lba, uint32_t
 static int ramdisk_write_blocks(struct block_device *bdev, uint64_t lba, uint32_t count, const void *buffer)
 {
     struct ramdisk_priv *priv = (struct ramdisk_priv *)bdev->private_data;
-    if (!priv || !priv->data) return -EINVAL;
+    if (!priv || !priv->data || !buffer) return -EINVAL;
+    if (count > bdev->total_blocks || lba > bdev->total_blocks - count) {
+        return -EIO;
+    }
 
     uint64_t offset = lba * bdev->block_size;
     uint64_t bytes = (uint64_t)count * bdev->block_size;

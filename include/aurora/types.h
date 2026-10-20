@@ -14,6 +14,13 @@ typedef unsigned long long uint64_t;
 typedef int64_t            intptr_t;
 typedef uint64_t           uintptr_t;
 
+#ifndef UINT64_MAX
+#define UINT64_MAX         (~0ULL)
+#endif
+#ifndef UINT32_MAX
+#define UINT32_MAX         (~0U)
+#endif
+
 typedef uint64_t           size_t;
 typedef int64_t            ssize_t;
 typedef int64_t            ptrdiff_t;

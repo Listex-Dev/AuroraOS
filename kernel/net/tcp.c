@@ -286,6 +286,10 @@ int tcp_receive(struct netdev *dev, uint32_t src_ip, uint32_t dst_ip, netbuf_t *
     uint32_t ack_seq = net_ntohl(tcp->ack_seq);
     uint8_t flags = tcp->flags;
     size_t hdr_len = tcp->doff * 4;
+    if (hdr_len < sizeof(struct tcphdr) || hdr_len > nb->len) {
+        netbuf_free(nb);
+        return -1;
+    }
 
     /* Match socket */
     struct socket *matched = NULL;
