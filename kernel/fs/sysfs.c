@@ -235,8 +235,45 @@ void sysfs_register_netdev(struct netdev *dev)
     }
 }
 
+static struct dentry *s_pci_bus_d = NULL;
+static struct dentry *s_block_d = NULL;
+
+static void sysfs_populate_dynamic(struct super_block *sb)
+{
+    if (s_pci_bus_d) {
+        for (struct pci_device *pdev = pci_get_device_list(); pdev != NULL; pdev = pdev->next) {
+            char dev_name[32];
+            snprintf(dev_name, sizeof(dev_name), "0000:%02x:%02x.%d", pdev->bus, pdev->slot, pdev->func);
+            if (!dentry_lookup(s_pci_bus_d, dev_name)) {
+                struct dentry *pdev_d = create_sysfs_dir(sb, s_pci_bus_d, dev_name);
+                if (pdev_d) {
+                    create_sysfs_file_data(sb, pdev_d, "vendor", read_pci_vendor, pdev, 0444);
+                    create_sysfs_file_data(sb, pdev_d, "device", read_pci_device, pdev, 0444);
+                    create_sysfs_file_data(sb, pdev_d, "class", read_pci_class, pdev, 0444);
+                    create_sysfs_file_data(sb, pdev_d, "driver", read_pci_driver, pdev, 0444);
+                }
+            }
+        }
+    }
+    if (s_block_d) {
+        for (struct block_device *b = bdev_get_list(); b != NULL; b = b->next) {
+            if (!dentry_lookup(s_block_d, b->name)) {
+                struct dentry *b_d = create_sysfs_dir(sb, s_block_d, b->name);
+                if (b_d) {
+                    create_sysfs_file_data(sb, b_d, "size", read_bdev_size, b, 0444);
+                }
+            }
+        }
+    }
+}
+
 struct super_block *sysfs_create(void)
 {
+    if (s_sysfs_sb) {
+        sysfs_populate_dynamic(s_sysfs_sb);
+        return s_sysfs_sb;
+    }
+
     struct super_block *sb = (struct super_block *)kzalloc(sizeof(struct super_block), GFP_KERNEL);
     if (!sb) {
         return NULL;
@@ -289,14 +326,7 @@ struct super_block *sysfs_create(void)
 
     /* /sys/block */
     struct dentry *block_d = create_sysfs_dir(sb, root_dentry, "block");
-    if (block_d) {
-        for (struct block_device *b = bdev_get_list(); b != NULL; b = b->next) {
-            struct dentry *b_d = create_sysfs_dir(sb, block_d, b->name);
-            if (b_d) {
-                create_sysfs_file_data(sb, b_d, "size", read_bdev_size, b, 0444);
-            }
-        }
-    }
+    s_block_d = block_d;
 
     /* /sys/devices */
     struct dentry *dev_d = create_sysfs_dir(sb, root_dentry, "devices");
@@ -311,20 +341,10 @@ struct super_block *sysfs_create(void)
 
         /* /sys/devices/pci0000:00/0000:00:xx.x/... */
         struct dentry *pci_bus_d = create_sysfs_dir(sb, dev_d, "pci0000:00");
-        if (pci_bus_d) {
-            for (struct pci_device *pdev = pci_get_device_list(); pdev != NULL; pdev = pdev->next) {
-                char dev_name[32];
-                snprintf(dev_name, sizeof(dev_name), "0000:%02x:%02x.%d", pdev->bus, pdev->slot, pdev->func);
-                struct dentry *pdev_d = create_sysfs_dir(sb, pci_bus_d, dev_name);
-                if (pdev_d) {
-                    create_sysfs_file_data(sb, pdev_d, "vendor", read_pci_vendor, pdev, 0444);
-                    create_sysfs_file_data(sb, pdev_d, "device", read_pci_device, pdev, 0444);
-                    create_sysfs_file_data(sb, pdev_d, "class", read_pci_class, pdev, 0444);
-                    create_sysfs_file_data(sb, pdev_d, "driver", read_pci_driver, pdev, 0444);
-                }
-            }
-        }
+        s_pci_bus_d = pci_bus_d;
     }
+
+    sysfs_populate_dynamic(sb);
 
     return sb;
 }

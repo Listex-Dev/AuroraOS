@@ -67,5 +67,7 @@ void *sbrk(intptr_t increment);
 int brk(void *addr);
 
 long syscall(long number, ...);
+int init_module(void *module_image, unsigned long len, const char *param_values);
+int delete_module(const char *name, unsigned int flags);
 
 #endif /* _UNISTD_H */

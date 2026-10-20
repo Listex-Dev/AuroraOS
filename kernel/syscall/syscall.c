@@ -146,6 +146,10 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_arch_prctl((int)a1, (unsigned long)a2);
         case SYS_mknod:
             return sys_mknod((const char *)a1, (mode_t)a2, (dev_t)a3);
+        case SYS_init_module:
+            return sys_init_module((void *)a1, (unsigned long)a2, (const char *)a3);
+        case SYS_delete_module:
+            return sys_delete_module((const char *)a1, (unsigned int)a2);
         default:
             printk("<4>[SYSCALL] Unimplemented syscall %llu\n", (unsigned long long)num);
             return -ENOSYS;

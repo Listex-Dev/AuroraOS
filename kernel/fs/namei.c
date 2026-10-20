@@ -21,6 +21,10 @@ struct dentry *vfs_namei(const char *path)
         curr = (fs && fs->pwd) ? fs->pwd : vfs_get_root();
     }
 
+    if (!curr) {
+        return NULL;
+    }
+
     if (curr->d_mounted) {
         curr = curr->d_mounted->mnt_root;
     }

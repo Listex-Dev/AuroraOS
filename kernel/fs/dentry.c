@@ -46,7 +46,11 @@ struct dentry *dentry_lookup(struct dentry *parent, const char *name)
         strncpy(probe.d_name, name, sizeof(probe.d_name) - 1);
         probe.d_parent = parent;
         probe.d_sb = parent->d_sb;
-        return parent->d_inode->i_op->lookup(parent->d_inode, &probe);
+        struct dentry *res = parent->d_inode->i_op->lookup(parent->d_inode, &probe);
+        if (res == &probe) {
+            res = dentry_create(name, parent, probe.d_inode);
+        }
+        return res;
     }
 
     return NULL;

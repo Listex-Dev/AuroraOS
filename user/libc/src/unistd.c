@@ -338,3 +338,13 @@ long syscall(long number, ...)
     va_end(ap);
     return __syscall_ret(__syscall6(number, a1, a2, a3, a4, a5, a6));
 }
+
+int init_module(void *module_image, unsigned long len, const char *param_values)
+{
+    return (int)__syscall_ret(__syscall3(SYS_init_module, (long)module_image, (long)len, (long)param_values));
+}
+
+int delete_module(const char *name, unsigned int flags)
+{
+    return (int)__syscall_ret(__syscall2(SYS_delete_module, (long)name, (long)flags));
+}

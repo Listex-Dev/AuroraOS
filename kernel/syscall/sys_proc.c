@@ -342,16 +342,34 @@ int64_t sys_execve(const char *filename, char *const argv[], char *const envp[])
         sys_close(vfs_fd);
     }
 
-    if (!elf_data) {
-        mode_t b_mode = 0755;
-        uid_t b_uid = 0;
-        gid_t b_gid = 0;
-        elf_data = find_builtin_binary_meta(kfilename, &binary_size, &b_mode, &b_uid, &b_gid);
-        if (elf_data) {
-            bin_mode = b_mode;
-            bin_uid = b_uid;
-            bin_gid = b_gid;
-            bin_has_stat = true;
+    if (!elf_data && kfilename[0] != '/') {
+        char fullpath[256];
+        snprintf(fullpath, sizeof(fullpath), "/bin/%s", kfilename);
+        int bin_fd = sys_open(fullpath, O_RDONLY, 0);
+        if (bin_fd < 0) {
+            snprintf(fullpath, sizeof(fullpath), "/sbin/%s", kfilename);
+            bin_fd = sys_open(fullpath, O_RDONLY, 0);
+        }
+        if (bin_fd >= 0) {
+            struct stat st;
+            if (sys_fstat(bin_fd, &st) == 0 && st.st_size > 0 && st.st_size < 16 * 1024 * 1024) {
+                bin_mode = st.st_mode;
+                bin_uid = st.st_uid;
+                bin_gid = st.st_gid;
+                bin_has_stat = true;
+                vfs_elf_buf = kmalloc(st.st_size, GFP_KERNEL);
+                if (vfs_elf_buf) {
+                    ssize_t rd = sys_read(bin_fd, vfs_elf_buf, st.st_size);
+                    if (rd == (ssize_t)st.st_size) {
+                        elf_data = vfs_elf_buf;
+                        binary_size = st.st_size;
+                    } else {
+                        kfree(vfs_elf_buf);
+                        vfs_elf_buf = NULL;
+                    }
+                }
+            }
+            sys_close(bin_fd);
         }
     }
 

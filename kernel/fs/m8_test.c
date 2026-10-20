@@ -34,6 +34,7 @@ bool test_ext4_root_subsystem(void)
     printk("<6>[  0.000000] Running Milestone M8 verification test (ext2/ext4 R/W, mkfs, fsck, pivot_root, fstab)...\n");
 
     /* 1. Initialize Block Device Subsystem */
+    struct super_block *saved_root_sb = vfs_get_root() ? vfs_get_root()->d_sb : NULL;
     block_subsys_init();
     ahci_init();
     ata_init();
@@ -242,6 +243,21 @@ bool test_ext4_root_subsystem(void)
     if (final_fsck != 0) {
         printk("<0>[TEST M8] FAILED: Post-write fsck reported errors: %d\n", final_fsck);
         return false;
+    }
+
+    /* Restore system root if pivoted during test */
+    if (saved_root_sb) {
+        vfs_set_root(saved_root_sb);
+        task_t *curr = sched_current();
+        if (curr && curr->fs) {
+            struct fs_struct *fs = (struct fs_struct *)curr->fs;
+            fs->root = saved_root_sb->s_root;
+            fs->pwd = saved_root_sb->s_root;
+        }
+        struct dentry *mnt_d = vfs_namei("/mnt");
+        if (mnt_d) {
+            mnt_d->d_mounted = NULL;
+        }
     }
 
     /* 9. Milestone M8 Acceptance */

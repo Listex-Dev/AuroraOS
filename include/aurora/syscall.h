@@ -64,6 +64,8 @@
 #define SYS_arch_prctl 158
 #define SYS_mount      165
 #define SYS_umount2    166
+#define SYS_init_module   175
+#define SYS_delete_module 176
 #define SYS_getdents64 217
 
 struct stat;
@@ -121,5 +123,7 @@ int64_t sys_setregid(gid_t rgid, gid_t egid);
 int64_t sys_chmod(const char *pathname, mode_t mode);
 int64_t sys_fchmod(int fd, mode_t mode);
 int64_t sys_arch_prctl(int code, unsigned long addr);
+int64_t sys_init_module(void *umod, unsigned long len, const char *uargs);
+int64_t sys_delete_module(const char *name, unsigned int flags);
 
 #endif /* _AURORA_SYSCALL_H */

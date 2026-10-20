@@ -25,10 +25,77 @@
 #define ELFDATA2LSB 1
 #define EV_CURRENT 1
 
+#define ET_NONE 0
+#define ET_REL  1
 #define ET_EXEC 2
 #define ET_DYN  3
+#define ET_CORE 4
 
 #define EM_X86_64 62
+
+/* Section Header Types */
+#define SHT_NULL     0
+#define SHT_PROGBITS 1
+#define SHT_SYMTAB   2
+#define SHT_STRTAB   3
+#define SHT_RELA     4
+#define SHT_HASH     5
+#define SHT_DYNAMIC  6
+#define SHT_NOTE     7
+#define SHT_NOBITS   8
+#define SHT_REL      9
+#define SHT_SHLIB    10
+#define SHT_DYNSYM   11
+
+/* Section Header Flags */
+#define SHF_WRITE     0x1
+#define SHF_ALLOC     0x2
+#define SHF_EXECINSTR 0x4
+
+/* Special Section Indices */
+#define SHN_UNDEF     0
+#define SHN_LORESERVE 0xff00
+#define SHN_ABS       0xfff1
+#define SHN_COMMON    0xfff2
+#define SHN_HIRESERVE 0xffff
+
+/* Symbol Binding & Types */
+#define ELF64_ST_BIND(val) (((unsigned char)(val)) >> 4)
+#define ELF64_ST_TYPE(val) ((val) & 0xf)
+#define ELF64_ST_INFO(bind, type) (((bind) << 4) + ((type) & 0xf))
+
+#define STB_LOCAL  0
+#define STB_GLOBAL 1
+#define STB_WEAK   2
+
+#define STT_NOTYPE  0
+#define STT_OBJECT  1
+#define STT_FUNC    2
+#define STT_SECTION 3
+#define STT_FILE    4
+#define STT_COMMON  5
+#define STT_TLS     6
+
+/* Relocation Types for x86-64 */
+#define R_X86_64_NONE      0
+#define R_X86_64_64        1
+#define R_X86_64_PC32      2
+#define R_X86_64_GOT32     3
+#define R_X86_64_PLT32     4
+#define R_X86_64_COPY      5
+#define R_X86_64_GLOB_DAT  6
+#define R_X86_64_JUMP_SLOT 7
+#define R_X86_64_RELATIVE  8
+#define R_X86_64_32        10
+#define R_X86_64_32S       11
+#define R_X86_64_16        12
+#define R_X86_64_PC16      13
+#define R_X86_64_8         14
+#define R_X86_64_PC8       15
+
+#define ELF64_R_SYM(i)    ((i) >> 32)
+#define ELF64_R_TYPE(i)   ((i) & 0xffffffffL)
+#define ELF64_R_INFO(sym, type) ((((uint64_t)(sym)) << 32) + ((uint64_t)(type) & 0xffffffffL))
 
 /* Segment Types */
 #define PT_NULL    0
@@ -91,6 +158,34 @@ typedef struct {
     uint64_t p_memsz;
     uint64_t p_align;
 } Elf64_Phdr;
+
+typedef struct {
+    uint32_t sh_name;
+    uint32_t sh_type;
+    uint64_t sh_flags;
+    uint64_t sh_addr;
+    uint64_t sh_offset;
+    uint64_t sh_size;
+    uint32_t sh_link;
+    uint32_t sh_info;
+    uint64_t sh_addralign;
+    uint64_t sh_entsize;
+} Elf64_Shdr;
+
+typedef struct {
+    uint32_t st_name;
+    uint8_t  st_info;
+    uint8_t  st_other;
+    uint16_t st_shndx;
+    uint64_t st_value;
+    uint64_t st_size;
+} Elf64_Sym;
+
+typedef struct {
+    uint64_t r_offset;
+    uint64_t r_info;
+    int64_t  r_addend;
+} Elf64_Rela;
 
 typedef struct {
     uint64_t a_type;

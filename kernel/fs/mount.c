@@ -25,6 +25,10 @@ int vfs_mount(const char *source, const char *target, const char *fstype, uint32
 
     struct dentry *target_dentry = vfs_namei(target);
     if (!target_dentry) {
+        vfs_mkdir(target, 0755);
+        target_dentry = vfs_namei(target);
+    }
+    if (!target_dentry) {
         return -ENOENT;
     }
 
@@ -102,9 +106,17 @@ int vfs_pivot_root(const char *new_root_path, const char *put_old_path)
     }
 
     struct dentry *new_root_dentry = vfs_namei(new_root_path);
-    struct dentry *put_old_dentry = vfs_namei(put_old_path);
+    if (!new_root_dentry) {
+        return -ENOENT;
+    }
 
-    if (!new_root_dentry || !put_old_dentry) {
+    struct dentry *put_old_dentry = vfs_namei(put_old_path);
+    if (!put_old_dentry) {
+        vfs_mkdir(put_old_path, 0755);
+        put_old_dentry = vfs_namei(put_old_path);
+    }
+
+    if (!put_old_dentry) {
         return -ENOENT;
     }
 
@@ -115,16 +127,23 @@ int vfs_pivot_root(const char *new_root_path, const char *put_old_path)
 
     /* Find mount record for new_root */
     struct vfsmount *new_mnt = NULL;
-    for (struct vfsmount *m = mount_list_head; m != NULL; m = m->mnt_next) {
-        if (m->mnt_root == new_root_dentry) {
-            new_mnt = m;
-            break;
+    if (new_root_dentry->d_mounted) {
+        new_mnt = new_root_dentry->d_mounted;
+    } else {
+        for (struct vfsmount *m = mount_list_head; m != NULL; m = m->mnt_next) {
+            if (m->mnt_root == new_root_dentry || m->mnt_mountpoint == new_root_dentry) {
+                new_mnt = m;
+                break;
+            }
         }
     }
 
     if (!new_mnt) {
         return -EINVAL;
     }
+
+    new_root_dentry->d_mounted = NULL;
+    new_mnt->mnt_mountpoint = NULL;
 
     struct dentry *old_root_dentry = vfs_get_root();
 

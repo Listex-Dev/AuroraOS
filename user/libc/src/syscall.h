@@ -61,6 +61,8 @@
 #define SYS_mknod      133
 #define SYS_arch_prctl 158
 #define SYS_mount      165
+#define SYS_init_module 175
+#define SYS_delete_module 176
 #define SYS_getdents64 217
 
 static inline long __syscall0(long n)

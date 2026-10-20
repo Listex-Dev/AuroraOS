@@ -124,6 +124,10 @@ struct file_operations g_bdev_fops = {
 
 void block_subsys_init(void)
 {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+
     g_bdev_list = NULL;
     printk("<6>[  0.000000] Block Layer: Initialized block device subsystem\n");
 }

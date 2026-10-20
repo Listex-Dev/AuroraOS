@@ -9,25 +9,11 @@
 #include <aurora/string.h>
 #include <aurora/printk.h>
 
-extern char pkg_sample_start[], pkg_sample_end[];
-extern char pkg_sample_corrupt_start[], pkg_sample_corrupt_end[];
-
 static void write_file(const char *path, const char *content, mode_t mode)
 {
     int fd = sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
     if (fd >= 0) {
         sys_write(fd, content, strlen(content));
-        sys_close(fd);
-    }
-}
-
-static void write_binary_file(const char *path, const void *data, size_t size, mode_t mode)
-{
-    int fd = sys_open(path, O_WRONLY | O_CREAT | O_TRUNC, mode);
-    if (fd >= 0) {
-        if (size > 0 && data) {
-            sys_write(fd, data, size);
-        }
         sys_close(fd);
     }
 }
@@ -315,15 +301,4 @@ void docs_and_pkg_subsys_init(void)
                "2. Binary Format:\n"
                "ELF64 static or dynamic executables loaded via ELF PT_LOAD segments.\n",
                0644);
-
-    /* 5. Deploy test packages to /packages/ */
-    size_t sample_sz = (size_t)(pkg_sample_end - pkg_sample_start);
-    if (sample_sz > 0) {
-        write_binary_file("/packages/sample.aurpkg", pkg_sample_start, sample_sz, 0644);
-    }
-
-    size_t corrupt_sz = (size_t)(pkg_sample_corrupt_end - pkg_sample_corrupt_start);
-    if (corrupt_sz > 0) {
-        write_binary_file("/packages/sample-corrupt.aurpkg", pkg_sample_corrupt_start, corrupt_sz, 0644);
-    }
 }

@@ -95,7 +95,9 @@ C_SRCS  := kernel/main.c \
            kernel/proc/m16_test.c \
            kernel/fs/docs.c \
            kernel/proc/m17_test.c \
-           kernel/proc/m18_test.c
+           kernel/proc/m18_test.c \
+           kernel/module/module.c \
+           kernel/proc/m19_test.c
 
 ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/idt_asm.S \
@@ -103,7 +105,6 @@ ASM_SRCS := boot/boot.S \
             kernel/arch/x86_64/syscall_entry.S \
             kernel/proc/user_test.S \
             kernel/proc/user_m5.S \
-            kernel/proc/builtin_binaries.S \
             kernel/fs/user_vfs.S \
             kernel/fs/user_m7.S \
             kernel/fs/user_m8.S \
@@ -157,7 +158,11 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/man \
               $(BUILD_DIR)/bin/test_m17 \
               $(BUILD_DIR)/bin/dmesg \
-              $(BUILD_DIR)/bin/test_m18
+              $(BUILD_DIR)/bin/test_m18 \
+              $(BUILD_DIR)/bin/insmod \
+              $(BUILD_DIR)/bin/rmmod \
+              $(BUILD_DIR)/bin/lsmod \
+              $(BUILD_DIR)/bin/test_m19
 
 .PHONY: all kernel run run-term debug test clean ssh
 
@@ -165,11 +170,14 @@ all: kernel
 
 kernel: $(TARGET_ELF) $(TARGET_BIN) $(DISK_IMG)
 
-$(DISK_IMG):
+$(BUILD_DIR)/rootfs.ext4: $(HELLO_ELF) $(USER_BINS) scripts/prepare_rootfs.sh
+	@bash scripts/prepare_rootfs.sh
+
+$(DISK_IMG): $(BUILD_DIR)/rootfs.ext4
 	@mkdir -p $(dir $@)
 	@dd if=/dev/zero of=$@ bs=1M count=64 status=none
 	@echo -e 'label: dos\n,32768,83\n,,83\n' | sfdisk -q $@ >/dev/null 2>&1 || true
-	@mke2fs -q -F -E offset=$$((34816 * 512)) -b 1024 -O ^has_journal $@ 48128 >/dev/null 2>&1 || true
+	@dd if=$(BUILD_DIR)/rootfs.ext4 of=$@ seek=17 bs=1M conv=notrunc status=none
 
 $(HELLO_ELF): user/hello.S
 	@mkdir -p $(dir $@)
@@ -178,8 +186,6 @@ $(HELLO_ELF): user/hello.S
 
 $(BUILD_DIR)/libc/libc.a $(USER_BINS):
 	@bash scripts/build_userland.sh
-
-$(BUILD_DIR)/kernel/proc/builtin_binaries.o: $(HELLO_ELF) $(USER_BINS)
 
 $(TARGET_ELF): $(OBJS) boot/linker.ld
 	@mkdir -p $(dir $@)
@@ -253,13 +259,13 @@ test: $(TARGET_BIN) $(DISK_IMG)
 		-display none \
 		-no-reboot -no-shutdown 2>&1 || true); \
 	echo "$$output"; \
-	if echo "$$output" | grep -q "Milestone M18 status: \[OK\]"; then \
+	if echo "$$output" | grep -q "Milestone M19 status: \[OK\]"; then \
 		echo ""; \
-		echo ">>> TEST PASSED: Milestone M18 Acceptance Criteria Verified! <<<"; \
+		echo ">>> TEST PASSED: Milestone M19 Acceptance Criteria Verified! <<<"; \
 		exit 0; \
 	else \
 		echo ""; \
-		echo ">>> TEST FAILED: Milestone M18 verification failed! <<<"; \
+		echo ">>> TEST FAILED: Milestone M19 verification failed! <<<"; \
 		exit 1; \
 	fi
 

@@ -172,6 +172,13 @@ static ssize_t gen_mounts(char *buf, size_t max_len)
     return vfs_format_mounts(buf, max_len);
 }
 
+extern size_t module_format_proc_modules(char *buf, size_t max_len);
+
+static ssize_t gen_modules(char *buf, size_t max_len)
+{
+    return (ssize_t)module_format_proc_modules(buf, max_len);
+}
+
 static ssize_t gen_self_status(char *buf, size_t max_len)
 {
     task_t *curr = sched_current();
@@ -326,8 +333,14 @@ static void create_proc_file(struct super_block *sb, struct dentry *parent, cons
     dentry_create(name, parent, inode);
 }
 
+static struct super_block *proc_sb = NULL;
+
 struct super_block *procfs_create(void)
 {
+    if (proc_sb) {
+        return proc_sb;
+    }
+
     struct super_block *sb = (struct super_block *)kzalloc(sizeof(struct super_block), GFP_KERNEL);
     if (!sb) {
         return NULL;
@@ -363,6 +376,7 @@ struct super_block *procfs_create(void)
     create_proc_file(sb, root_dentry, "devices", gen_devices);
     create_proc_file(sb, root_dentry, "partitions", gen_partitions);
     create_proc_file(sb, root_dentry, "mounts", gen_mounts);
+    create_proc_file(sb, root_dentry, "modules", gen_modules);
 
     /* /proc/self directory */
     struct inode *self_dir_inode = inode_alloc(sb);
@@ -389,5 +403,6 @@ struct super_block *procfs_create(void)
         }
     }
 
+    proc_sb = sb;
     return sb;
 }

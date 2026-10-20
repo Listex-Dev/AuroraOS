@@ -18,10 +18,15 @@ echo "  AR build/libc/libc.a"
 ar rcs build/libc/libc.a build/libc/*.o
 
 echo "=== Building AuroraOS User Utilities ==="
-for bin in ls cat cp ps vi grep sleep test_m10 sh getty login init test_m11 mknod fdisk mount test_m12 ping test_m13 dhclient nslookup ifconfig netstat wget test_m14 id su chmod test_m15 syslogd logger crond crontab sshd telinit touch echo test_m16 pkg man aurora-extra test_m17 dmesg test_m18; do
+for bin in ls cat cp ps vi grep sleep test_m10 sh getty login init test_m11 mknod fdisk mount test_m12 ping test_m13 dhclient nslookup ifconfig netstat wget test_m14 id su chmod test_m15 syslogd logger crond crontab sshd telinit touch echo test_m16 pkg man aurora-extra test_m17 dmesg test_m18 insmod rmmod lsmod test_m19; do
     echo "  CC/LD user bin: $bin"
     gcc $CFLAGS -static user/bin/${bin}.c build/libc/crt0.o build/libc/libc.a -o build/bin/${bin}
 done
+
+echo "=== Building AuroraOS Kernel Modules (.ko) ==="
+mkdir -p build/lib/modules
+echo "  CC/LD kernel module: test_module.ko"
+gcc -nostdlib -fno-builtin -r -mcmodel=kernel -fno-pie -Iinclude modules/test_module/test_module.c -o build/lib/modules/test_module.ko
 
 echo "=== Packaging M17 Sample Packages ==="
 gcc -O2 -Iuser/libc/include tools/pkg-build.c -o tools/pkg-build

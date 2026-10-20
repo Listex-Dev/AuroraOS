@@ -23,6 +23,7 @@
 #include <aurora/proc/m4_test.h>
 #include <aurora/proc/m5_test.h>
 #include <aurora/fs/vfs.h>
+#include <aurora/fs/mount.h>
 #include <aurora/fs/m6_test.h>
 #include <aurora/fs/m7_test.h>
 #include <aurora/fs/m8_test.h>
@@ -46,6 +47,8 @@
 #include <aurora/proc/m16_test.h>
 #include <aurora/proc/m17_test.h>
 #include <aurora/proc/m18_test.h>
+#include <aurora/proc/m19_test.h>
+#include <aurora/module.h>
 #include <aurora/fs/docs.h>
 #include <aurora/net/dhcp.h>
 #include <aurora/net/netdev.h>
@@ -277,6 +280,7 @@ static void launch_init_process(void)
     uint64_t entry_point = 0;
     uint64_t brk_start = 0;
     int ret = elf64_load_pml4(user_pml4, elf_data, bin_size, &entry_point, &brk_start);
+    kfree((void *)elf_data);
     if (ret < 0) {
         panic("launch_init_process: Failed to load ELF binary");
     }
@@ -362,6 +366,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     kmalloc_init();
 
     vfs_init();
+    module_subsys_init();
 
     pic_init();
     pit_init(PIT_TARGET_HZ);
@@ -370,6 +375,26 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     sti();
 
     syscall_init();
+
+    /* Initialize storage hardware */
+    pci_init();
+    block_subsys_init();
+    ahci_init();
+    ata_init();
+
+    /* Mount decoupled ext4 root filesystem from /dev/sda2 if present */
+    struct block_device *root_bdev = bdev_get("sda2");
+    if (!root_bdev) root_bdev = bdev_get("sda1");
+    if (!root_bdev) root_bdev = bdev_get("sda");
+    if (root_bdev) {
+        int merr = vfs_mount(root_bdev->name, "/mnt", "ext4", 0, NULL);
+        if (merr == 0) {
+            vfs_pivot_root("/mnt", "/mnt/old_root");
+            vfs_mount_fstab("/etc/fstab");
+            sys_chmod("/etc/shadow", 0640);
+            sys_chmod("/etc/pkg/trusted/aurora.key", 0600);
+        }
+    }
 
     bool is_test = false;
     if (g_boot_info.cmdline) {
@@ -382,7 +407,7 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
     }
 
     if (is_test) {
-        /* Run Milestone Verification Suites (M1 through M12) */
+        /* Run Milestone Verification Suites (M1 through M19) */
         test_page_fault_handling();
         test_memory_subsystem();
         test_scheduler_multitasking();
@@ -401,12 +426,9 @@ void kmain(uint64_t magic, uint64_t mbi_addr)
         test_m16_services_subsystem();
         test_m17_package_and_docs_subsystem();
         test_m18_final_system_verification();
+        test_m19_lkm_and_clean_kernel();
     } else {
         /* Interactive Production Boot: initialize drivers and start PID 1 */
-        pci_init();
-        block_subsys_init();
-        ahci_init();
-        ata_init();
         netdev_subsys_init();
         arp_init();
         icmp_init();

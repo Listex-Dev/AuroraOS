@@ -593,7 +593,11 @@ static struct dentry *ext2_lookup(struct inode *dir, struct dentry *target)
     uint8_t *blk_buf = (uint8_t *)kmalloc(fs->block_size, GFP_KERNEL);
     if (!blk_buf) return NULL;
 
-    uint32_t num_blocks = dir_info->raw.i_size / fs->block_size;
+    uint32_t num_blocks = (dir_info->raw.i_size + fs->block_size - 1) / fs->block_size;
+    if (num_blocks == 0 && dir_info->raw.i_blocks > 0) {
+        num_blocks = dir_info->raw.i_blocks / (fs->block_size / 512);
+    }
+
     for (uint32_t b = 0; b < num_blocks; b++) {
         uint32_t pblock = ext2_bmap(fs, &dir_info->raw, b, false);
         if (pblock == 0) continue;
@@ -609,9 +613,9 @@ static struct dentry *ext2_lookup(struct inode *dir, struct dentry *target)
                 struct ext2_inode raw;
                 if (ext2_read_raw_inode(fs, de->inode, &raw) == 0) {
                     struct inode *child_inode = ext2_build_vfs_inode(dir->i_sb, de->inode, &raw);
-                    target->d_inode = child_inode;
                     kfree(blk_buf);
-                    return target;
+                    if (!child_inode) return NULL;
+                    return dentry_create(target_name, target->d_parent, child_inode);
                 }
             }
 

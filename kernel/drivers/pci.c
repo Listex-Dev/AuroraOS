@@ -248,6 +248,10 @@ static void pci_scan_device(uint8_t bus, uint8_t slot)
 
 void pci_init(void)
 {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+
     printk("<6>[  0.000000] PCI: Initializing PCI bus subsystem and scanning devices...\n");
     g_pci_devices = NULL;
 

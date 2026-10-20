@@ -180,6 +180,10 @@ int devtmpfs_register_blkdev(uint32_t major, uint32_t minor, const char *name,
 
 struct super_block *devtmpfs_create(void)
 {
+    if (dev_sb) {
+        return dev_sb;
+    }
+
     struct super_block *sb = (struct super_block *)kzalloc(sizeof(struct super_block), GFP_KERNEL);
     if (!sb) {
         return NULL;
