@@ -166,6 +166,9 @@ int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
                 dentry->d_inode->i_gid = curr->egid;
             }
             dentry->d_inode->i_mode = (dentry->d_inode->i_mode & ~07777) | (effective_mode & 07777);
+            if (dentry->d_inode->i_sb && dentry->d_inode->i_sb->s_op && dentry->d_inode->i_sb->s_op->write_inode) {
+                dentry->d_inode->i_sb->s_op->write_inode(dentry->d_inode);
+            }
         }
     } else if ((flags & O_CREAT) && (flags & O_EXCL)) {
         return -EEXIST;
@@ -195,6 +198,9 @@ int vfs_open(const char *path, int flags, mode_t mode, struct file **res)
 
     if ((flags & O_TRUNC) && S_ISREG(inode->i_mode) && ((flags & O_ACCMODE) != O_RDONLY)) {
         inode->i_size = 0;
+        if (inode->i_op && inode->i_op->truncate) {
+            inode->i_op->truncate(inode);
+        }
     }
 
     struct file *file = (struct file *)kzalloc(sizeof(struct file), GFP_KERNEL);
@@ -237,6 +243,11 @@ int vfs_close(struct file *file)
 
     file->f_count--;
     if (file->f_count <= 0) {
+        if ((file->f_flags & (O_WRONLY | O_RDWR)) && file->f_inode) {
+            if (file->f_inode->i_sb && file->f_inode->i_sb->s_op && file->f_inode->i_sb->s_op->write_inode) {
+                file->f_inode->i_sb->s_op->write_inode(file->f_inode);
+            }
+        }
         if (file->f_op && file->f_op->release) {
             file->f_op->release(file->f_inode, file);
         }
@@ -405,6 +416,9 @@ int vfs_mkdir(const char *path, mode_t mode)
             child->d_inode->i_gid = curr->egid;
         }
         child->d_inode->i_mode = (child->d_inode->i_mode & ~07777) | (effective_mode & 07777);
+        if (child->d_inode->i_sb && child->d_inode->i_sb->s_op && child->d_inode->i_sb->s_op->write_inode) {
+            child->d_inode->i_sb->s_op->write_inode(child->d_inode);
+        }
     }
 
     return 0;
@@ -504,6 +518,9 @@ int64_t sys_chmod(const char *pathname, mode_t mode)
     }
 
     d->d_inode->i_mode = (d->d_inode->i_mode & ~07777) | (mode & 07777);
+    if (d->d_inode->i_sb && d->d_inode->i_sb->s_op && d->d_inode->i_sb->s_op->write_inode) {
+        d->d_inode->i_sb->s_op->write_inode(d->d_inode);
+    }
     return 0;
 }
 
@@ -523,5 +540,8 @@ int64_t sys_fchmod(int fd, mode_t mode)
     }
 
     inode->i_mode = (inode->i_mode & ~07777) | (mode & 07777);
+    if (inode->i_sb && inode->i_sb->s_op && inode->i_sb->s_op->write_inode) {
+        inode->i_sb->s_op->write_inode(inode);
+    }
     return 0;
 }

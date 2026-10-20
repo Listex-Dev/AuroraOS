@@ -1,6 +1,7 @@
 #include <aurora/syscall.h>
 #include <aurora/fs/vfs.h>
 #include <aurora/fs/mount.h>
+#include <aurora/drivers/block.h>
 #include <aurora/proc/sched.h>
 #include <aurora/mm/heap.h>
 #include <aurora/string.h>
@@ -557,6 +558,32 @@ int64_t sys_pipe(int pipefd[2])
 
     pipefd[0] = rfd;
     pipefd[1] = wfd;
+    return 0;
+}
+
+int64_t sys_sync(void)
+{
+    for (struct block_device *b = bdev_get_list(); b != NULL; b = b->next) {
+        bdev_flush(b);
+    }
+    return 0;
+}
+
+int64_t sys_fsync(int fd)
+{
+    if (fd < 0 || fd >= NR_OPEN) return -EBADF;
+    struct files_struct *files = get_current_files();
+    if (!files || !files->fd[fd]) return -EBADF;
+
+    struct file *file = files->fd[fd];
+    if (file->f_inode) {
+        if (file->f_inode->i_sb && file->f_inode->i_sb->s_op && file->f_inode->i_sb->s_op->write_inode) {
+            file->f_inode->i_sb->s_op->write_inode(file->f_inode);
+        }
+    }
+    for (struct block_device *b = bdev_get_list(); b != NULL; b = b->next) {
+        bdev_flush(b);
+    }
     return 0;
 }
 

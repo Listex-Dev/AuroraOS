@@ -15,6 +15,7 @@
 
 #define AHCI_CMD_READ_DMA_EXT   0x25
 #define AHCI_CMD_WRITE_DMA_EXT  0x35
+#define AHCI_CMD_FLUSH_CACHE_EXT 0xEA
 #define AHCI_CMD_IDENTIFY       0xEC
 
 typedef volatile struct hba_port {

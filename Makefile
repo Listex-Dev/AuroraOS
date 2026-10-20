@@ -162,6 +162,7 @@ USER_BINS  := $(BUILD_DIR)/bin/ls \
               $(BUILD_DIR)/bin/insmod \
               $(BUILD_DIR)/bin/rmmod \
               $(BUILD_DIR)/bin/lsmod \
+              $(BUILD_DIR)/bin/sync \
               $(BUILD_DIR)/bin/test_m19
 
 .PHONY: all kernel run run-term debug test clean ssh

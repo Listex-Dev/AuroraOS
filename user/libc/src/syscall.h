@@ -37,6 +37,7 @@
 #define SYS_wait4       61
 #define SYS_kill        62
 #define SYS_uname       63
+#define SYS_fsync       74
 #define SYS_getcwd      79
 #define SYS_chdir       80
 #define SYS_mkdir       83
@@ -60,6 +61,7 @@
 #define SYS_getpgid    121
 #define SYS_mknod      133
 #define SYS_arch_prctl 158
+#define SYS_sync       162
 #define SYS_mount      165
 #define SYS_init_module 175
 #define SYS_delete_module 176

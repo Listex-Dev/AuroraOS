@@ -85,18 +85,22 @@ static int ahci_exec_cmd(struct ahci_port_dev *adev, uint8_t command, uint64_t l
         fis->counth = (uint8_t)((count >> 8) & 0xFF);
     }
 
-    uint32_t byte_count = (command == AHCI_CMD_IDENTIFY) ? 512 : (count * 512);
-    adev->cmd_tbl->prdt_entry[0].dba = (uint32_t)(adev->bounce_phys & 0xFFFFFFFF);
-    adev->cmd_tbl->prdt_entry[0].dbau = (uint32_t)(adev->bounce_phys >> 32);
-    adev->cmd_tbl->prdt_entry[0].dbc = (byte_count - 1) & 0x3FFFFF;
-    adev->cmd_tbl->prdt_entry[0].i = 1;
+    bool is_non_data = (command == AHCI_CMD_FLUSH_CACHE_EXT || command == 0xE7);
 
     /* Setup Command Header 0 */
     hba_cmd_header_t *hdr = &adev->cmd_headers[0];
     hdr->cfl = sizeof(fis_reg_h2d_t) / sizeof(uint32_t); /* 5 DWORDS */
     hdr->w = is_write ? 1 : 0;
-    hdr->prdtl = 1;
+    hdr->prdtl = is_non_data ? 0 : 1;
     hdr->prdbc = 0;
+
+    if (!is_non_data) {
+        uint32_t byte_count = (command == AHCI_CMD_IDENTIFY) ? 512 : (count * 512);
+        adev->cmd_tbl->prdt_entry[0].dba = (uint32_t)(adev->bounce_phys & 0xFFFFFFFF);
+        adev->cmd_tbl->prdt_entry[0].dbau = (uint32_t)(adev->bounce_phys >> 32);
+        adev->cmd_tbl->prdt_entry[0].dbc = (byte_count - 1) & 0x3FFFFF;
+        adev->cmd_tbl->prdt_entry[0].i = 1;
+    }
 
     __asm__ __volatile__("" ::: "memory");
     port->serr = port->serr;
@@ -214,8 +218,9 @@ static int ahci_bdev_write(struct block_device *bdev, uint64_t lba, uint32_t cou
 
 static int ahci_bdev_flush(struct block_device *bdev)
 {
-    (void)bdev;
-    return 0;
+    struct ahci_port_dev *adev = (struct ahci_port_dev *)bdev->private_data;
+    if (!adev) return -EINVAL;
+    return ahci_exec_cmd(adev, AHCI_CMD_FLUSH_CACHE_EXT, 0, 0, false);
 }
 
 static struct block_device_ops g_ahci_bdev_ops = {

@@ -348,3 +348,13 @@ int delete_module(const char *name, unsigned int flags)
 {
     return (int)__syscall_ret(__syscall2(SYS_delete_module, (long)name, (long)flags));
 }
+
+void sync(void)
+{
+    __syscall0(SYS_sync);
+}
+
+int fsync(int fd)
+{
+    return (int)__syscall_ret(__syscall1(SYS_fsync, fd));
+}

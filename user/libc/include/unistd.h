@@ -59,6 +59,8 @@ int access(const char *pathname, int mode);
 int unlink(const char *pathname);
 int rmdir(const char *pathname);
 int isatty(int fd);
+void sync(void);
+int fsync(int fd);
 
 unsigned int sleep(unsigned int seconds);
 int usleep(unsigned int usec);

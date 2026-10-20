@@ -136,6 +136,10 @@ int64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3, ui
             return sys_chmod((const char *)a1, (mode_t)a2);
         case SYS_fchmod:
             return sys_fchmod((int)a1, (mode_t)a2);
+        case SYS_sync:
+            return sys_sync();
+        case SYS_fsync:
+            return sys_fsync((int)a1);
         case SYS_umask:
             return sys_umask((mode_t)a1);
         case SYS_setreuid:

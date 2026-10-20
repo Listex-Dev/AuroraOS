@@ -31,6 +31,7 @@ struct inode_operations {
     int (*mknod)(struct inode *dir, struct dentry *dentry, mode_t mode, dev_t dev);
     int (*unlink)(struct inode *dir, struct dentry *dentry);
     int (*rmdir)(struct inode *dir, struct dentry *dentry);
+    void (*truncate)(struct inode *inode);
 };
 
 /* 3. Superblock Operations */

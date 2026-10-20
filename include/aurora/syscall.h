@@ -57,11 +57,13 @@
 #define SYS_getpgrp    111
 #define SYS_setsid     112
 #define SYS_setreuid   113
+#define SYS_fsync      74
 #define SYS_setregid   114
 #define SYS_getpgid    121
 #define SYS_mknod      133
 #define SYS_pivot_root 155
 #define SYS_arch_prctl 158
+#define SYS_sync       162
 #define SYS_mount      165
 #define SYS_umount2    166
 #define SYS_init_module   175
@@ -122,6 +124,8 @@ int64_t sys_setreuid(uid_t ruid, uid_t euid);
 int64_t sys_setregid(gid_t rgid, gid_t egid);
 int64_t sys_chmod(const char *pathname, mode_t mode);
 int64_t sys_fchmod(int fd, mode_t mode);
+int64_t sys_sync(void);
+int64_t sys_fsync(int fd);
 int64_t sys_arch_prctl(int code, unsigned long addr);
 int64_t sys_init_module(void *umod, unsigned long len, const char *uargs);
 int64_t sys_delete_module(const char *name, unsigned int flags);
