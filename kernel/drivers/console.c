@@ -213,6 +213,8 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
             /* Cursor position: 1-indexed */
             int row = (p1 > 0) ? p1 - 1 : 0;
             int col = (p2 > 0) ? p2 - 1 : 0;
+            if (row < 0) row = 0;
+            if (col < 0) col = 0;
             if (row >= VGA_HEIGHT) row = VGA_HEIGHT - 1;
             if (col >= VGA_WIDTH) col = VGA_WIDTH - 1;
             vt->cursor_y = row;
@@ -248,6 +250,7 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
         case 'G': {
             /* Cursor Horizontal Absolute */
             int col = (p1 > 0) ? p1 - 1 : 0;
+            if (col < 0) col = 0;
             if (col >= VGA_WIDTH) col = VGA_WIDTH - 1;
             vt->cursor_x = col;
             break;
@@ -255,6 +258,7 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
         case 'd': {
             /* Cursor Vertical Absolute */
             int row = (p1 > 0) ? p1 - 1 : 0;
+            if (row < 0) row = 0;
             if (row >= VGA_HEIGHT) row = VGA_HEIGHT - 1;
             vt->cursor_y = row;
             break;
@@ -262,6 +266,7 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
         case 'S': {
             /* Scroll up (pan down) */
             int n = (p1 > 0) ? p1 : 1;
+            if (n > VGA_HEIGHT) n = VGA_HEIGHT;
             for (int i = 0; i < n; i++) {
                 vt_scroll(vt);
             }
@@ -270,6 +275,7 @@ static void handle_csi_cmd(struct vt_console *vt, int vt_num, char cmd)
         case 'T': {
             /* Scroll down (pan up) */
             int n = (p1 > 0) ? p1 : 1;
+            if (n > VGA_HEIGHT) n = VGA_HEIGHT;
             uint16_t blank = (uint16_t)(' ' | ((uint16_t)vt->cur_attr << 8));
             for (int i = 0; i < n; i++) {
                 for (int y = VGA_HEIGHT - 1; y > 0; y--) {

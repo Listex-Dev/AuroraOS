@@ -226,6 +226,8 @@ int main(int argc, char **argv)
                     for (int i = line_count; i > cursor_row + 1; i--) {
                         strcpy(lines[i], lines[i - 1]);
                     }
+                    int cur_len = strlen(lines[cursor_row]);
+                    if (cursor_col > cur_len) cursor_col = cur_len;
                     int rem_len = strlen(&lines[cursor_row][cursor_col]);
                     strcpy(lines[cursor_row + 1], &lines[cursor_row][cursor_col]);
                     lines[cursor_row][cursor_col] = '\0';
@@ -238,6 +240,7 @@ int main(int argc, char **argv)
                 }
             } else if (c >= 32 && c <= 126) {
                 int len = strlen(lines[cursor_row]);
+                if (cursor_col > len) cursor_col = len;
                 if (len < MAX_LINE_LEN - 2) {
                     memmove(&lines[cursor_row][cursor_col + 1],
                             &lines[cursor_row][cursor_col],

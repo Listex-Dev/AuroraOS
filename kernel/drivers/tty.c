@@ -401,6 +401,9 @@ static int tty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
         case TIOCSWINSZ:
             if (!arg) return -EFAULT;
             memcpy(&tty->winsize, (const void *)arg, sizeof(struct winsize));
+            if (tty->pgrp > 0) {
+                sys_kill(-tty->pgrp, SIGWINCH);
+            }
             return 0;
 
         case TIOCGPGRP:

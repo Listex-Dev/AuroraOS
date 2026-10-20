@@ -220,6 +220,11 @@ void vmm_destroy_user_space(uint64_t *pml4)
         return;
     }
 
+    uint64_t current_cr3 = read_cr3() & ~0xFFFULL;
+    if (vmm_virt_to_phys_direct(pml4) == current_cr3) {
+        write_cr3(vmm_virt_to_phys_direct(vmm_get_kernel_pml4()));
+    }
+
     for (size_t pml4_i = 0; pml4_i < 256; pml4_i++) {
         if (!(pml4[pml4_i] & PTE_PRESENT)) {
             continue;

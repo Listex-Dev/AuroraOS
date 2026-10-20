@@ -211,8 +211,13 @@ void *krealloc(void *ptr, size_t new_size, uint32_t flags)
 
 void *kmalloc_aligned(size_t size, size_t alignment, uint32_t flags)
 {
-    if (alignment <= sizeof(void *)) {
-        return kmalloc(size, flags);
+    if (alignment < sizeof(void *)) {
+        alignment = sizeof(void *);
+    }
+    if ((alignment & (alignment - 1)) != 0) {
+        size_t a = sizeof(void *);
+        while (a < alignment) a <<= 1;
+        alignment = a;
     }
 
     /* Allocate extra space to fit alignment and offset storage */

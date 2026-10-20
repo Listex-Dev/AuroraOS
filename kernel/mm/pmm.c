@@ -196,7 +196,7 @@ uintptr_t pmm_alloc_pages(size_t count)
 
 static void pmm_free_page_unlocked(uintptr_t phys_addr)
 {
-    if (phys_addr % PAGE_SIZE != 0) {
+    if (phys_addr == 0 || phys_addr % PAGE_SIZE != 0) {
         return;
     }
     size_t page_idx = phys_addr / PAGE_SIZE;

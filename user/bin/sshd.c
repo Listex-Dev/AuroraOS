@@ -175,7 +175,7 @@ static void handle_client(int client_fd, struct sockaddr_in *client_addr)
 
     log_auth("Accepted password for %s from %s port %d", username, client_ip, client_port);
 
-    const char *welcome = "\r\nWelcome to AuroraOS 1.0.0 (x86_64 remote terminal)!\r\n\r\n";
+    const char *welcome = "\r\nWelcome to AuroraOS 2.0 Ultra (x86_64 remote terminal)!\r\n\r\n";
     write(client_fd, welcome, strlen(welcome));
 
     /* 4. Allocate PTY pair */

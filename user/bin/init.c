@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #define INITCTL_FILE "/run/initctl"
 #define RC_CONF      "/etc/rc.conf"
