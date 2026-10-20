@@ -51,8 +51,8 @@ wheel:x:10:root,aurora
 EOF
 
 cat << 'EOF' > "$ROOTFS"/etc/shadow
-root:$6$salt$1234567890abcdef:19000:0:99999:7:::
-aurora:$6$salt$1234567890abcdef:19000:0:99999:7:::
+root:$6$saltsalt$FCtXpTmG7SvkmMFnnZIotZMsxPcyMf9rYNlYFfsA2Fau3J9awLnj6tPMJW6qxQdpHAgjs0cvMWQ2Ve2HWIdX2/:19000:0:99999:7:::
+aurora:$6$saltsalt$VcYMCBfELnOcDK8outogXZyOp5rTpzY5E2LZQKa6N.QAElzmqtqwgRygFvpH/3Mcts8sy/gn7EtOsH5Rw/Xw4/:19000:0:99999:7:::
 EOF
 chmod 0600 "$ROOTFS"/etc/shadow
 
